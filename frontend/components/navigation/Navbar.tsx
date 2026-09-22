@@ -16,14 +16,14 @@ interface NavbarProps {
 export function Navbar({ onMobileMenuToggle, className = '' }: NavbarProps) {
   return (
     <header
-      className={`sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-zinc-800 bg-black px-4 sm:px-6 lg:px-8 ${className}`}
+      className={`sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-[#9E1519] bg-[#B81D22] text-white px-4 sm:px-6 lg:px-8 ${className}`}
     >
       {/* Mobile Drawer Trigger */}
       <div className="flex items-center gap-3 lg:hidden">
         <button
           type="button"
           onClick={onMobileMenuToggle}
-          className="inline-flex items-center justify-center rounded-lg p-2 text-zinc-400 hover:bg-zinc-900 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+          className="inline-flex items-center justify-center rounded-lg p-2 text-white/80 hover:bg-white/15 hover:text-white focus:outline-none focus:ring-2 focus:ring-white"
           aria-label="Open sidebar navigation"
         >
           <NavIcon name="menu" className="h-6 w-6" />

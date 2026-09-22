@@ -78,8 +78,8 @@ export const ROLE_NAVIGATION: Record<UserRole, RoleNavigationConfig> = {
 
   teacher: {
     role: 'teacher',
-    roleLabel: 'Instructor / Faculty',
-    roleBadge: 'Faculty',
+    roleLabel: 'Teacher',
+    roleBadge: 'Teachers',
     roleColor: {
       bg: 'bg-red-600/15',
       text: 'text-red-500',
