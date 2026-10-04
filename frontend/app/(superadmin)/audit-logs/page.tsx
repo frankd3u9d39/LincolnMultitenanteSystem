@@ -15,7 +15,7 @@ interface AuditLog {
   ipAddress: string;
   userAgent: string;
   description: string;
-  details?: Record<string, any>;
+  details?: Record<string, string | number | boolean>;
 }
 
 const INITIAL_AUDIT_LOGS: AuditLog[] = [
