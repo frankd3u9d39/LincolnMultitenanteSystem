@@ -8,24 +8,23 @@ interface SchoolTenant {
   name: string;
   code: string;
   domain: string;
-  plan: string;
   students: number;
   teachers: number;
   storageMb: number;
-  status: 'active' | 'trialing' | 'suspended';
+  status: 'active' | 'pending' | 'suspended';
   admin: string;
 }
 
 const INITIAL_SCHOOLS: SchoolTenant[] = [
-  { id: 1, name: 'Lincoln College of Science Management & Technology', code: 'LC-SMTS-001', domain: 'lincoln.edu', plan: 'Enterprise University', students: 1240, teachers: 84, storageMb: 142350, status: 'active', admin: 'Dr. Sarah Jenkins' },
-  { id: 2, name: 'St. Augustine Science & Arts Academy', code: 'SA-SMTS-002', domain: 'st-augustine.ac.uk', plan: 'Pro Academic', students: 980, teachers: 65, storageMb: 48200, status: 'active', admin: 'Dr. Julian Thorne' },
-  { id: 3, name: 'Horizon STEM Institute', code: 'HZ-SMTS-003', domain: 'horizon-stem.org', plan: 'Enterprise University', students: 1450, teachers: 96, storageMb: 110400, status: 'active', admin: 'Dr. Fiona Gallagher' },
-  { id: 4, name: 'Kingsway Polytechnic', code: 'KP-SMTS-004', domain: 'kingswaypoly.ac.uk', plan: 'Pro Academic', students: 820, teachers: 54, storageMb: 62100, status: 'active', admin: 'Robert Stirling' },
-  { id: 5, name: 'Cambridge International College', code: 'CIC-SMTS-005', domain: 'cambridge-intl.org', plan: 'Enterprise University', students: 1890, teachers: 120, storageMb: 215400, status: 'active', admin: 'Dr. Victoria Alcott' },
-  { id: 6, name: 'Apex Advanced Science Academy', code: 'AASA-SMTS-006', domain: 'apexscience.edu', plan: 'Pro Academic', students: 740, teachers: 48, storageMb: 39400, status: 'active', admin: 'Prof. David Mercer' },
-  { id: 7, name: 'Oakridge Technical High', code: 'OTH-SMTS-007', domain: 'oakridge.sch.uk', plan: 'Starter Campus', students: 310, teachers: 22, storageMb: 12800, status: 'active', admin: 'Eleanor Vance' },
-  { id: 19, name: 'Crestview Maritime Academy', code: 'CMA-SMTS-019', domain: 'crestview.ac.uk', plan: 'Pro Academic', students: 120, teachers: 12, storageMb: 5200, status: 'trialing', admin: 'Capt. Thomas Hayes' },
-  { id: 20, name: 'Vanguard Institute of Sciences', code: 'VIS-SMTS-020', domain: 'vanguardsciences.edu', plan: 'Pro Academic', students: 640, teachers: 42, storageMb: 68900, status: 'suspended', admin: 'Arthur Pendelton' },
+  { id: 1, name: 'Lincoln College of Science Management & Technology', code: 'LC-SMTS-001', domain: 'lincoln.edu', students: 1240, teachers: 84, storageMb: 142350, status: 'active', admin: 'Dr. Sarah Jenkins' },
+  { id: 2, name: 'St. Augustine Science & Arts Academy', code: 'SA-SMTS-002', domain: 'st-augustine.ac.uk', students: 980, teachers: 65, storageMb: 48200, status: 'active', admin: 'Dr. Julian Thorne' },
+  { id: 3, name: 'Horizon STEM Institute', code: 'HZ-SMTS-003', domain: 'horizon-stem.org', students: 1450, teachers: 96, storageMb: 110400, status: 'active', admin: 'Dr. Fiona Gallagher' },
+  { id: 4, name: 'Kingsway Polytechnic', code: 'KP-SMTS-004', domain: 'kingswaypoly.ac.uk', students: 820, teachers: 54, storageMb: 62100, status: 'active', admin: 'Robert Stirling' },
+  { id: 5, name: 'Cambridge International College', code: 'CIC-SMTS-005', domain: 'cambridge-intl.org', students: 1890, teachers: 120, storageMb: 215400, status: 'active', admin: 'Dr. Victoria Alcott' },
+  { id: 6, name: 'Apex Advanced Science Academy', code: 'AASA-SMTS-006', domain: 'apexscience.edu', students: 740, teachers: 48, storageMb: 39400, status: 'active', admin: 'Prof. David Mercer' },
+  { id: 7, name: 'Oakridge Technical High', code: 'OTH-SMTS-007', domain: 'oakridge.sch.uk', students: 310, teachers: 22, storageMb: 12800, status: 'active', admin: 'Eleanor Vance' },
+  { id: 19, name: 'Crestview Maritime Academy', code: 'CMA-SMTS-019', domain: 'crestview.ac.uk', students: 120, teachers: 12, storageMb: 5200, status: 'pending', admin: 'Capt. Thomas Hayes' },
+  { id: 20, name: 'Vanguard Institute of Sciences', code: 'VIS-SMTS-020', domain: 'vanguardsciences.edu', students: 640, teachers: 42, storageMb: 68900, status: 'suspended', admin: 'Arthur Pendelton' },
 ];
 
 export default function SuperAdminDashboardPage() {
@@ -98,7 +97,7 @@ export default function SuperAdminDashboardPage() {
               <div className="text-3xl font-black text-zinc-900 tracking-tight">20</div>
             </div>
             <div className="mt-3 flex items-center justify-between text-[11px] sm:text-xs text-zinc-500 pt-2 border-t border-zinc-100 gap-1">
-              <span className="truncate">1 Trial &bull; 1 Suspended</span>
+              <span className="truncate">1 Pending &bull; 1 Suspended</span>
               <span className="text-emerald-600 font-bold shrink-0">+2 this month</span>
             </div>
           </div>
@@ -129,33 +128,30 @@ export default function SuperAdminDashboardPage() {
           </div>
         </div>
 
-        {/* Card 3: Platform Gross MRR */}
+        {/* Card 3: Governance Attention */}
         <div className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 shadow-sm hover:shadow-md transition-all group">
           {/* Background Watermark Icon */}
-          <div className="pointer-events-none absolute -right-2 -bottom-2 text-emerald-500/[0.08] group-hover:text-emerald-500/[0.14] group-hover:scale-110 transition-all duration-300">
+          <div className="pointer-events-none absolute -right-2 -bottom-2 text-amber-500/[0.08] group-hover:text-amber-500/[0.14] group-hover:scale-110 transition-all duration-300">
             <svg className="w-24 h-24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
-              <rect x="2.5" y="5.5" width="19" height="13" rx="2" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="12" cy="12" r="3" strokeWidth={1.2} />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12h.01M18 12h.01" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
             </svg>
           </div>
           <div className="relative z-10 flex flex-col justify-between h-full">
             <div>
               <div className="flex items-center justify-between gap-1.5 mb-2">
-                <span className="font-semibold uppercase tracking-wider text-[11px] text-zinc-500 truncate">Recurring Revenue</span>
-                <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] shrink-0 whitespace-nowrap">
-                  MRR
+                <span className="font-semibold uppercase tracking-wider text-[11px] text-zinc-500 truncate">Needs Attention</span>
+                <span className="font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] shrink-0 whitespace-nowrap">
+                  Governance
                 </span>
               </div>
-              <div className="text-3xl font-black text-zinc-900 tracking-tight">₦90,547</div>
+              <div className="text-3xl font-black text-zinc-900 tracking-tight">2</div>
             </div>
             <div className="mt-3 flex items-center justify-between text-[11px] sm:text-xs text-zinc-500 pt-2 border-t border-zinc-100 gap-1">
-              <span className="truncate">18 Subscriptions</span>
-              <span className="text-emerald-600 font-bold shrink-0">+12.4% YoY</span>
+              <span className="truncate">1 Pending verification</span>
+              <span className="text-red-600 font-bold shrink-0">1 Suspended</span>
             </div>
           </div>
         </div>
-
         {/* Card 4: Global Storage Usage */}
         <div className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 shadow-sm hover:shadow-md transition-all group">
           {/* Background Watermark Icon */}
@@ -197,7 +193,7 @@ export default function SuperAdminDashboardPage() {
 
             {/* Filter pills */}
             <div className="flex items-center gap-1.5 p-1 bg-zinc-100 rounded-xl">
-              {['all', 'active', 'trialing', 'suspended'].map((status) => (
+              {['all', 'active', 'pending', 'suspended'].map((status) => (
                 <button
                   key={status}
                   type="button"
@@ -231,7 +227,6 @@ export default function SuperAdminDashboardPage() {
               <thead className="bg-zinc-50 border-b border-zinc-200/80 text-zinc-500 font-semibold uppercase text-[10px] tracking-wider">
                 <tr>
                   <th className="py-2.5 px-3">School Name &amp; Code</th>
-                  <th className="py-2.5 px-3">Plan Tier</th>
                   <th className="py-2.5 px-3 text-right">Students</th>
                   <th className="py-2.5 px-3 text-right">Storage</th>
                   <th className="py-2.5 px-3 text-center">Status</th>
@@ -249,11 +244,6 @@ export default function SuperAdminDashboardPage() {
                         <span className="text-zinc-500">{school.domain}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-3">
-                      <span className="inline-block px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 font-medium text-[11px]">
-                        {school.plan}
-                      </span>
-                    </td>
                     <td className="py-3 px-3 text-right font-bold text-zinc-900">
                       {school.students.toLocaleString()}
                     </td>
@@ -265,8 +255,8 @@ export default function SuperAdminDashboardPage() {
                         className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
                           school.status === 'active'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : school.status === 'trialing'
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : school.status === 'pending'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
                             : 'bg-red-50 text-red-700 border border-red-200'
                         }`}
                       >
@@ -311,12 +301,11 @@ export default function SuperAdminDashboardPage() {
 
               <div className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-100">
                 <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
-                  <span className="font-bold text-blue-600 uppercase">tenant.plan_updated</span>
+                  <span className="font-bold text-blue-600 uppercase">tenant.quota_raised</span>
                   <span>2h ago</span>
                 </div>
-                <div className="font-semibold text-zinc-800">Lincoln College upgraded to Enterprise tier.</div>
-                <div className="text-[11px] text-zinc-500 font-mono mt-0.5">₦9,990 / yr &bull; 500GB Storage</div>
-              </div>
+                <div className="font-semibold text-zinc-800">Lincoln College storage quota raised.</div>
+                <div className="text-[11px] text-zinc-500 font-mono mt-0.5">500 GB &rarr; 1 TB &bull; Approved by A. Cross</div>              </div>
 
               <div className="p-2.5 rounded-xl bg-red-50/50 border border-red-100">
                 <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">

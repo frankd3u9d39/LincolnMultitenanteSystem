@@ -1,19 +1,19 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import { SubscriptionTier } from '../types';
+
 import { ModalPrimaryButton, ModalSecondaryButton, ModalShell } from './ModalShell';
-import { TIER_PRESETS } from '../utils';
+import { DEFAULT_RESOURCE_LIMITS } from '../utils';
 
 export interface OnboardDraft {
   name: string;
   code: string;
   domain: string;
   city: string;
-  tier: SubscriptionTier;
+  storageQuotaGb: number;
   principalAdmin: string;
   principalEmail: string;
-  startAsTrial: boolean;
+  activateImmediately: boolean;
 }
 
 interface OnboardSchoolModalProps {
@@ -50,10 +50,10 @@ export function OnboardSchoolModal({
     code: '',
     domain: '',
     city: '',
-    tier: 'pro',
+    storageQuotaGb: DEFAULT_RESOURCE_LIMITS.storageQuotaGb,
     principalAdmin: '',
     principalEmail: '',
-    startAsTrial: true,
+    activateImmediately: false,
   });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [codeTouched, setCodeTouched] = useState(false);
@@ -120,7 +120,6 @@ export function OnboardSchoolModal({
   const labelClass = 'block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5';
   const errorClass = 'mt-1 text-[11px] font-semibold text-red-600';
 
-  const preset = TIER_PRESETS[draft.tier];
 
   return (
     <form onSubmit={handleSubmit}>
@@ -227,54 +226,32 @@ export function OnboardSchoolModal({
           </div>
 
           <div>
-            <span className={labelClass}>Subscription Tier</span>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {(Object.keys(TIER_PRESETS) as SubscriptionTier[]).map((tier) => {
-                const option = TIER_PRESETS[tier];
-                return (
-                  <label
-                    key={tier}
-                    className={`rounded-xl border p-3 cursor-pointer transition-all ${
-                      draft.tier === tier
-                        ? 'border-[#B81D22] bg-red-50/40 ring-2 ring-red-600/10'
-                        : 'border-zinc-200 hover:bg-zinc-50/60'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="onboard-tier"
-                        value={tier}
-                        checked={draft.tier === tier}
-                        onChange={() => update('tier', tier)}
-                        className="w-3.5 h-3.5 accent-[#B81D22] shrink-0"
-                      />
-                      <span className="text-xs font-bold text-zinc-900">{option.label}</span>
-                    </div>
-                    <div className="text-[11px] text-zinc-500 mt-1.5">
-                      ₦{option.monthlyFeeNgn.toLocaleString()} / month
-                    </div>
-                    <div className="text-[11px] text-zinc-400">
-                      {option.maxStudents.toLocaleString()} students &bull; {option.storageQuotaGb} GB
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
+            <label className={labelClass} htmlFor="onboard-quota">Storage Quota (GB)</label>
+            <input
+              id="onboard-quota"
+              type="text"
+              inputMode="numeric"
+              value={draft.storageQuotaGb.toLocaleString()}
+              onChange={(e) => update('storageQuotaGb', Number(e.target.value.replace(/[^0-9]/g, '')) || 0)}
+              className={`${inputClass('name')} max-w-xs`}
+            />
+            <p className="mt-1 text-[11px] text-zinc-400">
+              Platform default is {DEFAULT_RESOURCE_LIMITS.storageQuotaGb} GB. The system is free to use — this is
+              a capacity guard, not a price plan, and it can be raised later.
+            </p>
           </div>
-
           <label className="flex items-start gap-3 rounded-xl border border-zinc-200 p-3.5 cursor-pointer hover:bg-zinc-50/60 transition-colors">
             <input
               type="checkbox"
-              checked={draft.startAsTrial}
-              onChange={(e) => update('startAsTrial', e.target.checked)}
+              checked={draft.activateImmediately}
+              onChange={(e) => update('activateImmediately', e.target.checked)}
               className="mt-0.5 w-4 h-4 accent-[#B81D22] shrink-0"
             />
             <span className="min-w-0">
-              <span className="block text-xs font-bold text-zinc-900">Start on a 30-day trial</span>
+              <span className="block text-xs font-bold text-zinc-900">Activate without domain verification</span>
               <span className="block text-[11px] text-zinc-500 mt-0.5">
-                No charge until the trial ends. Unticked, the tenant is billed ₦
-                {preset.monthlyFeeNgn.toLocaleString()} from provisioning.
+                The school goes live straight away. Left unticked, it stays pending until the domain is
+                verified.
               </span>
             </span>
           </label>

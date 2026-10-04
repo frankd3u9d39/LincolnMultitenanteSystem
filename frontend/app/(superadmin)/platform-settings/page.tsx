@@ -4,7 +4,7 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Platform Settings & Governance | Lincoln Multi-Tenant Academic Platform',
-  description: 'Global multi-tenant configuration, security policies, storage tier limits, and mail infrastructure.',
+  description: 'Global multi-tenant configuration, security policies, tenant resource limits, and mail infrastructure.',
 };
 
 export default function PlatformSettingsPage() {

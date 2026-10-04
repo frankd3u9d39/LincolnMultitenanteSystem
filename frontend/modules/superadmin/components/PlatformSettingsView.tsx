@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FullPlatformSettings, SubscriptionTier, TierLimitConfig } from '../types';
-import { ModalPrimaryButton, ModalSecondaryButton, ModalShell } from './ModalShell';
+import { FullPlatformSettings, TenantResourceLimits } from '../types';
 
 type SettingsTab = 'general' | 'tenants' | 'security' | 'mail' | 'storage';
 
@@ -28,56 +27,16 @@ const INITIAL_SETTINGS: FullPlatformSettings = {
   },
   tenants: {
     onboardingMode: 'approval_required',
-    defaultTrialDays: 30,
-    defaultTier: 'pro',
     allowSubdomainCustomization: true,
     requireDomainVerification: true,
-    autoSuspendOverdueDays: 14,
+    autoSuspendInactiveDays: 180,
   },
-  tierLimits: {
-    starter: {
-      name: 'Starter Campus',
-      code: 'starter',
-      maxStudents: 500,
-      maxTeachers: 35,
-      storageQuotaGb: 50,
-      monthlyPriceNgn: 45000,
-      features: ['Attendance Tracking', 'Basic Gradebook', 'Student Portal', 'Email Notifications'],
-    },
-    pro: {
-      name: 'Pro Academic',
-      code: 'pro',
-      maxStudents: 2500,
-      maxTeachers: 150,
-      storageQuotaGb: 250,
-      monthlyPriceNgn: 120000,
-      features: [
-        'Everything in Starter',
-        'CBT Examination Engine',
-        'Custom Subdomain',
-        'Fee Payment Gateway',
-        'SMS Gateway Integration',
-        'Advanced Analytics',
-      ],
-    },
-    enterprise: {
-      name: 'Enterprise University',
-      code: 'enterprise',
-      maxStudents: 10000,
-      maxTeachers: 800,
-      storageQuotaGb: 1000,
-      monthlyPriceNgn: 350000,
-      features: [
-        'Everything in Pro',
-        'Custom Domain (FQDN + SSL)',
-        'Unlimited Historical Backups',
-        'Dedicated SLA & Priority Support',
-        'Custom API & Webhooks Access',
-        'Multi-Campus Partitioning',
-      ],
-    },
-  },
-  security: {
+  resourceLimits: {
+    maxStudents: 10000,
+    maxTeachers: 800,
+    storageQuotaGb: 250,
+    maxFileUploadMb: 50,
+  },  security: {
     enforceAdminMfa: true,
     minPasswordLength: 10,
     requireSpecialChars: true,
@@ -118,14 +77,7 @@ export function PlatformSettingsView() {
   const [testEmailResult, setTestEmailResult] = useState<string | null>(null);
   const [backupTriggering, setBackupTriggering] = useState(false);
   const [backupSuccessMsg, setBackupSuccessMsg] = useState<string | null>(null);
-  const [tierEditTarget, setTierEditTarget] = useState<SubscriptionTier | null>(null);
 
-  const handleTierLimitsChange = (tier: SubscriptionTier, limits: TierLimitConfig) => {
-    setSettings((prev) => ({
-      ...prev,
-      tierLimits: { ...prev.tierLimits, [tier]: limits },
-    }));
-  };
 
   const handleGeneralChange = <K extends keyof FullPlatformSettings['general']>(
     key: K,
@@ -177,6 +129,15 @@ export function PlatformSettingsView() {
     }));
   };
 
+  const handleResourceLimitsChange = <K extends keyof TenantResourceLimits>(
+    key: K,
+    value: TenantResourceLimits[K]
+  ) => {
+    setSettings((prev) => ({
+      ...prev,
+      resourceLimits: { ...prev.resourceLimits, [key]: value },
+    }));
+  };
   const handleSaveAll = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavedAlert(true);
@@ -221,7 +182,7 @@ export function PlatformSettingsView() {
             </span>
           </div>
           <p className="text-xs sm:text-sm text-zinc-500 mt-1">
-            Global multi-tenant governance, security enforcement, mail infrastructure, and tenant licensing policies.
+            Global multi-tenant governance, security enforcement, mail infrastructure, and tenant resource limits.
           </p>
         </div>
 
@@ -286,7 +247,7 @@ export function PlatformSettingsView() {
       <div className="flex border-b border-zinc-200 overflow-x-auto gap-2 text-xs sm:text-sm font-semibold">
         {([
           { key: 'general', label: 'General & Branding', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
-          { key: 'tenants', label: 'Tenant Onboarding & Tiers', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+          { key: 'tenants', label: 'Tenant Onboarding & Limits', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
           { key: 'security', label: 'Security & Access Policies', icon: 'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z' },
           { key: 'mail', label: 'Mail Infrastructure (SMTP)', icon: 'M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75' },
           { key: 'storage', label: 'Storage & Automated Backups', icon: 'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 5.625c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125' },
@@ -468,17 +429,18 @@ export function PlatformSettingsView() {
         </div>
       )}
 
-      {/* Tab 2: Tenant Onboarding & Tiers */}
+      {/* Tab 2: Tenant Onboarding & Resource Limits */}
       {activeTab === 'tenants' && (
         <div className="space-y-6">
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
             <h2 className="text-base font-bold text-zinc-900">Tenant Registration & Onboarding Governance</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">
+                <label className="block text-xs font-semibold text-zinc-700 mb-1" htmlFor="onboarding-policy">
                   Onboarding Policy
                 </label>
                 <select
+                  id="onboarding-policy"
                   value={settings.tenants.onboardingMode}
                   onChange={(e) => handleTenantsChange('onboardingMode', e.target.value as FullPlatformSettings['tenants']['onboardingMode'])}
                   className="w-full px-3.5 py-2 rounded-xl border border-zinc-300 text-xs sm:text-sm text-zinc-900 bg-white"
@@ -490,30 +452,21 @@ export function PlatformSettingsView() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">
-                  Default Trial Period (Days)
+                <label className="block text-xs font-semibold text-zinc-700 mb-1" htmlFor="auto-suspend-days">
+                  Auto-Suspension on Inactivity (Days)
                 </label>
                 <input
+                  id="auto-suspend-days"
                   type="number"
-                  value={settings.tenants.defaultTrialDays}
-                  onChange={(e) => handleTenantsChange('defaultTrialDays', parseInt(e.target.value) || 0)}
+                  value={settings.tenants.autoSuspendInactiveDays}
+                  onChange={(e) => handleTenantsChange('autoSuspendInactiveDays', parseInt(e.target.value) || 0)}
                   className="w-full px-3.5 py-2 rounded-xl border border-zinc-300 text-xs sm:text-sm text-zinc-900"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-700 mb-1">
-                  Auto-Suspension on Inactive / Overdue (Days)
-                </label>
-                <input
-                  type="number"
-                  value={settings.tenants.autoSuspendOverdueDays}
-                  onChange={(e) => handleTenantsChange('autoSuspendOverdueDays', parseInt(e.target.value) || 0)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-zinc-300 text-xs sm:text-sm text-zinc-900"
-                />
+                <p className="mt-1 text-[11px] text-zinc-400">
+                  Dormant schools are suspended after this long with no sign-in activity.
+                </p>
               </div>
             </div>
-
             <div className="pt-2 flex flex-col sm:flex-row gap-6 border-t border-zinc-100 text-xs text-zinc-700">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -537,79 +490,93 @@ export function PlatformSettingsView() {
             </div>
           </div>
 
-          {/* Subscription Tiers Matrix */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-bold text-zinc-900">Institutional Subscription Tiers & Resource Limits</h2>
-              <span className="text-xs text-zinc-500">Configures maximum limits applied when provisioning tenants</span>
+          {/* Default Tenant Resource Limits */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold text-zinc-900">Default Tenant Resource Limits</h2>
+                <p className="text-xs text-zinc-500">
+                  Applied when a school is provisioned. Individual tenants can be raised from the registry.
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold shrink-0">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                Free for every school
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {(Object.keys(settings.tierLimits) as SubscriptionTier[]).map((tierKey) => {
-                const tier = settings.tierLimits[tierKey];
-                return (
-                  <div
-                    key={tierKey}
-                    className={`rounded-2xl border p-5 shadow-sm bg-white flex flex-col justify-between ${
-                      tierKey === 'pro' ? 'border-[#B81D22] ring-2 ring-red-600/10' : 'border-zinc-200'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm text-zinc-900">{tier.name}</span>
-                        {tierKey === 'pro' && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#B81D22] text-white">
-                            Popular
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-2 text-2xl font-black text-zinc-900">
-                        ₦{(tier.monthlyPriceNgn).toLocaleString()}
-                        <span className="text-xs font-normal text-zinc-500"> / month</span>
-                      </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1" htmlFor="limit-maxStudents">
+                  Maximum Students
+                </label>
+                <input
+                  id="limit-maxStudents"
+                  type="text"
+                  inputMode="numeric"
+                  value={settings.resourceLimits.maxStudents.toLocaleString()}
+                  onChange={(e) =>
+                    handleResourceLimitsChange('maxStudents', Number(e.target.value.replace(/[^0-9]/g, '')) || 0)
+                  }
+                  className="w-full px-3.5 py-2 rounded-xl border border-zinc-300 text-xs sm:text-sm text-zinc-900"
+                />
+                <p className="mt-1 text-[11px] text-zinc-400">Enrolment ceiling for a single school.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1" htmlFor="limit-maxTeachers">
+                  Maximum Faculty & Staff
+                </label>
+                <input
+                  id="limit-maxTeachers"
+                  type="text"
+                  inputMode="numeric"
+                  value={settings.resourceLimits.maxTeachers.toLocaleString()}
+                  onChange={(e) =>
+                    handleResourceLimitsChange('maxTeachers', Number(e.target.value.replace(/[^0-9]/g, '')) || 0)
+                  }
+                  className="w-full px-3.5 py-2 rounded-xl border border-zinc-300 text-xs sm:text-sm text-zinc-900"
+                />
+                <p className="mt-1 text-[11px] text-zinc-400">Combined teaching and administrative accounts.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1" htmlFor="limit-storageQuotaGb">
+                  Storage Quota (GB)
+                </label>
+                <input
+                  id="limit-storageQuotaGb"
+                  type="text"
+                  inputMode="numeric"
+                  value={settings.resourceLimits.storageQuotaGb.toLocaleString()}
+                  onChange={(e) =>
+                    handleResourceLimitsChange('storageQuotaGb', Number(e.target.value.replace(/[^0-9]/g, '')) || 0)
+                  }
+                  className="w-full px-3.5 py-2 rounded-xl border border-zinc-300 text-xs sm:text-sm text-zinc-900"
+                />
+                <p className="mt-1 text-[11px] text-zinc-400">Default allocation per school, adjustable per tenant.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1" htmlFor="limit-maxFileUploadMb">
+                  Maximum Upload Size (MB)
+                </label>
+                <input
+                  id="limit-maxFileUploadMb"
+                  type="text"
+                  inputMode="numeric"
+                  value={settings.resourceLimits.maxFileUploadMb.toLocaleString()}
+                  onChange={(e) =>
+                    handleResourceLimitsChange('maxFileUploadMb', Number(e.target.value.replace(/[^0-9]/g, '')) || 0)
+                  }
+                  className="w-full px-3.5 py-2 rounded-xl border border-zinc-300 text-xs sm:text-sm text-zinc-900"
+                />
+                <p className="mt-1 text-[11px] text-zinc-400">Largest single file a school may upload.</p>
+              </div>
+            </div>
 
-                      <div className="mt-4 space-y-2.5 text-xs">
-                        <div className="flex justify-between py-1 border-b border-zinc-100">
-                          <span className="text-zinc-500">Max Students</span>
-                          <span className="font-bold text-zinc-900">{tier.maxStudents.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-zinc-100">
-                          <span className="text-zinc-500">Max Faculty / Staff</span>
-                          <span className="font-bold text-zinc-900">{tier.maxTeachers.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between py-1 border-b border-zinc-100">
-                          <span className="text-zinc-500">Storage Allocation</span>
-                          <span className="font-bold text-zinc-900">{tier.storageQuotaGb} GB</span>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 pt-3 border-t border-zinc-100">
-                        <span className="text-[11px] font-semibold text-zinc-500 block mb-2">INCLUDED MODULES:</span>
-                        <ul className="space-y-1.5 text-[11px] text-zinc-600">
-                          {tier.features.map((feat, idx) => (
-                            <li key={idx} className="flex items-center gap-1.5">
-                              <svg className="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.5 12.75l6 6 9-13.5" />
-                              </svg>
-                              <span>{feat}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 pt-3 border-t border-zinc-100">
-                      <button
-                        type="button"
-                        onClick={() => setTierEditTarget(tierKey)}
-                        className="w-full py-1.5 rounded-lg border border-zinc-200 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors"
-                      >
-                        Edit Tier Quotas
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3.5 text-[11px] text-zinc-600 leading-relaxed">
+              These are capacity guards that protect shared infrastructure, not a paid plan. Every school has
+              access to the full feature set at no cost; a school that outgrows a ceiling can simply be raised.
             </div>
           </div>
         </div>
@@ -1028,120 +995,6 @@ export function PlatformSettingsView() {
           </div>
         </div>
       )}
-      {tierEditTarget && (
-        <TierQuotaModal
-          tier={settings.tierLimits[tierEditTarget]}
-          onClose={() => setTierEditTarget(null)}
-          onSave={(limits) => handleTierLimitsChange(tierEditTarget, limits)}
-        />
-      )}
     </div>
-  );
-}
-
-interface TierQuotaModalProps {
-  tier: TierLimitConfig;
-  onClose: () => void;
-  onSave: (limits: TierLimitConfig) => void;
-}
-
-/** Edits the quota ceiling and price applied to every tenant on one subscription tier. */
-function TierQuotaModal({ tier, onClose, onSave }: TierQuotaModalProps) {
-  const [draft, setDraft] = useState<TierLimitConfig>(tier);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const updateNumber = (key: keyof TierLimitConfig, raw: string) => {
-    const value = Number(raw.replace(/[^0-9]/g, ''));
-    setDraft((prev) => ({ ...prev, [key]: Number.isNaN(value) ? 0 : value }));
-    setErrors((prev) => ({ ...prev, [key]: '' }));
-  };
-
-  const handleSave = () => {
-    const found: Record<string, string> = {};
-    if (draft.maxStudents < 1) found.maxStudents = 'Must allow at least one student.';
-    if (draft.maxTeachers < 1) found.maxTeachers = 'Must allow at least one staff member.';
-    if (draft.storageQuotaGb < 1) found.storageQuotaGb = 'Allocate at least 1 GB.';
-    if (draft.monthlyPriceNgn < 0) found.monthlyPriceNgn = 'Price cannot be negative.';
-
-    setErrors(found);
-    if (Object.keys(found).length > 0) return;
-
-    onSave(draft);
-    onClose();
-  };
-
-  const fields: Array<{ key: keyof TierLimitConfig; label: string; hint: string; prefix?: string }> = [
-    { key: 'maxStudents', label: 'Maximum Students', hint: 'Enrolment ceiling per tenant on this tier.' },
-    { key: 'maxTeachers', label: 'Maximum Faculty & Staff', hint: 'Combined teaching and admin accounts.' },
-    { key: 'storageQuotaGb', label: 'Storage Quota (GB)', hint: 'Applied to the tenant object store.' },
-    { key: 'monthlyPriceNgn', label: 'Monthly Price', hint: 'Charged at the start of each billing cycle.', prefix: '₦' },
-  ];
-
-  const changed = fields.some((field) => draft[field.key] !== tier[field.key]);
-
-  return (
-    <ModalShell
-      eyebrow="Subscription Tiers"
-      title={`Edit ${tier.name} Quotas`}
-      subtitle="Applies to every tenant provisioned on this tier, at their next billing cycle."
-      onClose={onClose}
-      footer={
-        <>
-          <ModalSecondaryButton onClick={onClose}>Cancel</ModalSecondaryButton>
-          <ModalPrimaryButton onClick={handleSave} disabled={!changed}>
-            Save Quotas
-          </ModalPrimaryButton>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {fields.map((field) => (
-            <div key={field.key}>
-              <label
-                className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5"
-                htmlFor={`tier-${field.key}`}
-              >
-                {field.label}
-              </label>
-              <div className="relative">
-                {field.prefix && (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
-                    {field.prefix}
-                  </span>
-                )}
-                <input
-                  id={`tier-${field.key}`}
-                  type="text"
-                  inputMode="numeric"
-                  value={Number(draft[field.key]).toLocaleString()}
-                  onChange={(e) => updateNumber(field.key, e.target.value)}
-                  className={`w-full ${field.prefix ? 'pl-7' : 'pl-3'} pr-3 py-2 text-xs rounded-xl border bg-white text-zinc-800 focus:outline-none focus:ring-2 transition-all ${
-                    errors[field.key]
-                      ? 'border-red-400 focus:ring-red-500/20 focus:border-red-500'
-                      : 'border-zinc-200 focus:ring-[#B81D22]/20 focus:border-[#B81D22]'
-                  }`}
-                />
-              </div>
-              {errors[field.key] ? (
-                <p className="mt-1 text-[11px] font-semibold text-red-600">{errors[field.key]}</p>
-              ) : (
-                <p className="mt-1 text-[11px] text-zinc-400">{field.hint}</p>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {changed && (
-          <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 text-[11px] text-blue-900 leading-relaxed">
-            <p className="font-bold uppercase tracking-wider">Pending change</p>
-            <p className="mt-1">
-              Existing tenants above the new ceiling keep their data but cannot add records until they upgrade
-              or reduce usage.
-            </p>
-          </div>
-        )}
-      </div>
-    </ModalShell>
   );
 }

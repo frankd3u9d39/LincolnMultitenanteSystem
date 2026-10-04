@@ -3,16 +3,12 @@
  * Multi-school platform governance, tenant management, and platform configuration models.
  */
 
-export type SubscriptionTier = 'starter' | 'pro' | 'enterprise';
-
-export interface TierLimitConfig {
-  name: string;
-  code: SubscriptionTier;
+/** Resource ceilings applied to every school. The platform is free, so there are no tiers. */
+export interface TenantResourceLimits {
   maxStudents: number;
   maxTeachers: number;
   storageQuotaGb: number;
-  monthlyPriceNgn: number;
-  features: string[];
+  maxFileUploadMb: number;
 }
 
 export interface PlatformGeneralSettings {
@@ -30,11 +26,9 @@ export interface PlatformGeneralSettings {
 
 export interface PlatformTenantSettings {
   onboardingMode: 'invitation_only' | 'approval_required' | 'open_registration';
-  defaultTrialDays: number;
-  defaultTier: SubscriptionTier;
   allowSubdomainCustomization: boolean;
   requireDomainVerification: boolean;
-  autoSuspendOverdueDays: number;
+  autoSuspendInactiveDays: number;
 }
 
 export interface PlatformSecuritySettings {
@@ -75,7 +69,7 @@ export interface PlatformStorageSettings {
 export interface FullPlatformSettings {
   general: PlatformGeneralSettings;
   tenants: PlatformTenantSettings;
-  tierLimits: Record<SubscriptionTier, TierLimitConfig>;
+  resourceLimits: TenantResourceLimits;
   security: PlatformSecuritySettings;
   mail: PlatformMailSettings;
   storage: PlatformStorageSettings;
@@ -85,26 +79,22 @@ export interface FullPlatformSettings {
 /* Tenant (School) Registry                                            */
 /* ------------------------------------------------------------------ */
 
-export type TenantStatus = 'active' | 'trialing' | 'suspended' | 'pending';
+export type TenantStatus = 'active' | 'suspended' | 'pending';
 
 export interface SchoolTenant {
   id: number;
   name: string;
   code: string;
   domain: string;
-  tier: SubscriptionTier;
-  tierLabel: string;
   status: TenantStatus;
   students: number;
   teachers: number;
   storageUsedGb: number;
   storageQuotaGb: number;
-  monthlyFeeNgn: number;
   principalAdmin: string;
   principalEmail: string;
   city: string;
   onboardedOn: string;
-  renewsOn: string;
   lastActivity: string;
 }
 
@@ -166,7 +156,7 @@ export interface SuperAdminProfile {
 export interface SuperAdminNotificationPrefs {
   tenantOnboarded: boolean;
   tenantSuspended: boolean;
-  billingFailures: boolean;
+  quotaBreaches: boolean;
   securityAlerts: boolean;
   backupResults: boolean;
   weeklyDigest: boolean;

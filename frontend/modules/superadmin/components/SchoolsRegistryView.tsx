@@ -2,38 +2,30 @@
 
 import React, { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { SchoolTenant, SubscriptionTier, TenantStatus } from '../types';
+import { SchoolTenant, TenantStatus } from '../types';
 import { SCHOOL_TENANTS } from '../services';
 import { useNotice } from '../hooks';
-import {
-  TENANT_STATUS_STYLES,
-  TIER_PRESETS,
-  TIER_STYLES,
-  downloadCsv,
-  storageUsagePercent,
-} from '../utils';
+import { TENANT_STATUS_STYLES, downloadCsv, storageUsagePercent } from '../utils';
 import { NoticeBanner } from './NoticeBanner';
 import { ConfirmDialog, ConfirmRequest } from './ConfirmDialog';
 import { OnboardDraft, OnboardSchoolModal } from './OnboardSchoolModal';
-import { BillingHistoryModal, ChangeTierModal } from './TenantDialogs';
+import { StorageQuotaModal } from './TenantDialogs';
 
-type SortKey = 'name' | 'students' | 'storageUsedGb' | 'monthlyFeeNgn';
+type SortKey = 'name' | 'students' | 'storageUsedGb';
 
 export function SchoolsRegistryView() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [statusFilter, setStatusFilter] = useState<'all' | TenantStatus>('all');
-  const [tierFilter, setTierFilter] = useState<'all' | SubscriptionTier>('all');
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('students');
   const [sortDesc, setSortDesc] = useState(true);
 
   const [tenants, setTenants] = useState<SchoolTenant[]>(SCHOOL_TENANTS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [onboardOpen, setOnboardOpen] = useState(() => searchParams.get('onboard') === '1');
-  const [tierTarget, setTierTarget] = useState<SchoolTenant | null>(null);
-  const [billingTarget, setBillingTarget] = useState<SchoolTenant | null>(null);
+  const [onboardOpenedHere, setOnboardOpenedHere] = useState(false);
+  const [quotaTarget, setQuotaTarget] = useState<SchoolTenant | null>(null);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const { notice, notify, dismiss } = useNotice();
 
@@ -48,64 +40,48 @@ export function SchoolsRegistryView() {
     if (deepLinkCode) router.replace('/schools');
   };
 
+  // Derived rather than seeded into state: the page is statically prerendered with no
+  // search params, so a lazy useState initializer would never see the deep link.
+  const onboardOpen = onboardOpenedHere || searchParams.get('onboard') === '1';
+
   const clearOnboardParam = () => {
-    setOnboardOpen(false);
+    setOnboardOpenedHere(false);
     if (searchParams.get('onboard')) router.replace('/schools');
   };
 
   const handleProvision = (draft: OnboardDraft) => {
-    const preset = TIER_PRESETS[draft.tier];
-
     const tenant: SchoolTenant = {
       id: Math.max(0, ...tenants.map((item) => item.id)) + 1,
       name: draft.name,
       code: draft.code,
       domain: draft.domain,
-      tier: draft.tier,
-      tierLabel: preset.label,
-      status: draft.startAsTrial ? 'trialing' : 'pending',
+      status: draft.activateImmediately ? 'active' : 'pending',
       students: 0,
       teachers: 0,
       storageUsedGb: 0,
-      storageQuotaGb: preset.storageQuotaGb,
-      monthlyFeeNgn: draft.startAsTrial ? 0 : preset.monthlyFeeNgn,
+      storageQuotaGb: draft.storageQuotaGb,
       principalAdmin: draft.principalAdmin,
       principalEmail: draft.principalEmail,
       city: draft.city,
       onboardedOn: '2026-10-04',
-      renewsOn: draft.startAsTrial ? '2026-11-03' : '2027-10-04',
       lastActivity: 'Awaiting first sign-in',
     };
 
     setTenants((prev) => [tenant, ...prev]);
     setStatusFilter('all');
-    setTierFilter('all');
     setQuery('');
     clearOnboardParam();
     setSelectedId(tenant.id);
     notify(
-      `${tenant.name} provisioned as ${tenant.code}. ${
-        draft.startAsTrial ? 'Trial runs to 2026-11-03.' : `Billing starts at ₦${preset.monthlyFeeNgn.toLocaleString()}/month.`
+      `${tenant.name} provisioned as ${tenant.code} with a ${draft.storageQuotaGb.toLocaleString()} GB quota.${
+        draft.activateImmediately ? ' The school is live now.' : ' It stays pending until the domain is verified.'
       }`
     );
   };
 
-  const handleTierChange = (tenant: SchoolTenant, tier: SubscriptionTier) => {
-    const preset = TIER_PRESETS[tier];
-    setTenants((prev) =>
-      prev.map((item) =>
-        item.id === tenant.id
-          ? {
-              ...item,
-              tier,
-              tierLabel: preset.label,
-              storageQuotaGb: preset.storageQuotaGb,
-              monthlyFeeNgn: item.status === 'trialing' ? 0 : preset.monthlyFeeNgn,
-            }
-          : item
-      )
-    );
-    notify(`${tenant.name} moved to ${preset.label}. New quota: ${preset.storageQuotaGb} GB.`);
+  const handleQuotaChange = (tenant: SchoolTenant, storageQuotaGb: number) => {
+    setTenants((prev) => prev.map((item) => (item.id === tenant.id ? { ...item, storageQuotaGb } : item)));
+    notify(`${tenant.name} storage quota set to ${storageQuotaGb.toLocaleString()} GB.`);
   };
 
   const handleToggleSuspension = (tenant: SchoolTenant) => {
@@ -140,7 +116,7 @@ export function SchoolsRegistryView() {
       students: tenants.reduce((sum, t) => sum + t.students, 0),
       teachers: tenants.reduce((sum, t) => sum + t.teachers, 0),
       storage: tenants.reduce((sum, t) => sum + t.storageUsedGb, 0),
-      mrr: tenants.filter((t) => t.status === 'active').reduce((sum, t) => sum + t.monthlyFeeNgn, 0),
+      needsAttention: tenants.filter((t) => t.status !== 'active').length,
     }),
     [tenants]
   );
@@ -149,7 +125,6 @@ export function SchoolsRegistryView() {
     const term = query.trim().toLowerCase();
     const filtered = tenants.filter((tenant) => {
       const matchesStatus = statusFilter === 'all' || tenant.status === statusFilter;
-      const matchesTier = tierFilter === 'all' || tenant.tier === tierFilter;
       const matchesQuery =
         term === '' ||
         tenant.name.toLowerCase().includes(term) ||
@@ -157,7 +132,7 @@ export function SchoolsRegistryView() {
         tenant.domain.toLowerCase().includes(term) ||
         tenant.principalAdmin.toLowerCase().includes(term) ||
         tenant.city.toLowerCase().includes(term);
-      return matchesStatus && matchesTier && matchesQuery;
+      return matchesStatus && matchesQuery;
     });
 
     return filtered.sort((a, b) => {
@@ -165,7 +140,7 @@ export function SchoolsRegistryView() {
       if (sortKey === 'name') return a.name.localeCompare(b.name) * direction;
       return (a[sortKey] - b[sortKey]) * direction;
     });
-  }, [tenants, query, statusFilter, tierFilter, sortKey, sortDesc]);
+  }, [tenants, query, statusFilter, sortKey, sortDesc]);
 
   const toggleSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -196,15 +171,15 @@ export function SchoolsRegistryView() {
               const fileName = downloadCsv(
                 'tenant_registry',
                 [
-                  'School Name', 'Tenant Code', 'Domain', 'Tier', 'Status', 'Students', 'Faculty',
-                  'Storage Used (GB)', 'Storage Quota (GB)', 'Monthly Fee (NGN)',
-                  'Principal Admin', 'Admin Email', 'City', 'Onboarded', 'Renews',
+                  'School Name', 'Tenant Code', 'Domain', 'Status', 'Students', 'Faculty',
+                  'Storage Used (GB)', 'Storage Quota (GB)',
+                  'Principal Admin', 'Admin Email', 'City', 'Onboarded', 'Last Activity',
                 ],
                 rows.map((tenant) => [
-                  tenant.name, tenant.code, tenant.domain, tenant.tierLabel, tenant.status,
+                  tenant.name, tenant.code, tenant.domain, tenant.status,
                   tenant.students, tenant.teachers, tenant.storageUsedGb.toFixed(1), tenant.storageQuotaGb,
-                  tenant.monthlyFeeNgn, tenant.principalAdmin, tenant.principalEmail, tenant.city,
-                  tenant.onboardedOn, tenant.renewsOn,
+                  tenant.principalAdmin, tenant.principalEmail, tenant.city,
+                  tenant.onboardedOn, tenant.lastActivity,
                 ])
               );
               notify(`Exported ${rows.length} tenant${rows.length === 1 ? '' : 's'} to ${fileName}.`);
@@ -215,7 +190,7 @@ export function SchoolsRegistryView() {
           </button>
           <button
             type="button"
-            onClick={() => setOnboardOpen(true)}
+            onClick={() => setOnboardOpenedHere(true)}
             className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 flex items-center gap-1.5"
           >
             <span className="text-base leading-none">+</span>
@@ -232,7 +207,7 @@ export function SchoolsRegistryView() {
           { label: 'Enrolled Tenants', value: totals.count.toString(), hint: `${totals.active} currently active`, accent: 'text-[#B81D22]' },
           { label: 'Campus Population', value: totals.students.toLocaleString(), hint: `${totals.teachers.toLocaleString()} faculty members`, accent: 'text-blue-700' },
           { label: 'Storage Consumed', value: `${(totals.storage / 1024).toFixed(2)} TB`, hint: 'Across all tenant buckets', accent: 'text-amber-700' },
-          { label: 'Recurring Revenue', value: `₦${totals.mrr.toLocaleString()}`, hint: 'Billed monthly, active only', accent: 'text-emerald-700' },
+          { label: 'Needs Attention', value: totals.needsAttention.toString(), hint: 'Suspended or awaiting verification', accent: 'text-amber-700' },
         ].map((card) => (
           <div key={card.label} className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 shadow-sm">
             <span className="font-semibold uppercase tracking-wider text-[11px] text-zinc-500">{card.label}</span>
@@ -247,7 +222,7 @@ export function SchoolsRegistryView() {
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 min-w-0">
             <div className="flex items-center gap-1.5 p-1 bg-zinc-100 rounded-xl max-w-full overflow-x-auto">
-              {(['all', 'active', 'trialing', 'suspended', 'pending'] as const).map((status) => (
+              {(['all', 'active', 'pending', 'suspended'] as const).map((status) => (
                 <button
                   key={status}
                   type="button"
@@ -261,20 +236,6 @@ export function SchoolsRegistryView() {
               ))}
             </div>
 
-            <div className="flex items-center gap-1.5 p-1 bg-zinc-100 rounded-xl max-w-full overflow-x-auto">
-              {(['all', 'starter', 'pro', 'enterprise'] as const).map((tier) => (
-                <button
-                  key={tier}
-                  type="button"
-                  onClick={() => setTierFilter(tier)}
-                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg capitalize transition-colors ${
-                    tierFilter === tier ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'
-                  }`}
-                >
-                  {tier}
-                </button>
-              ))}
-            </div>
           </div>
 
           <span className="text-[11px] text-zinc-500 shrink-0">
@@ -300,7 +261,6 @@ export function SchoolsRegistryView() {
                     School &amp; Domain{sortCaret('name')}
                   </button>
                 </th>
-                <th className="py-2.5 px-3">Tier</th>
                 <th className="py-2.5 px-3 text-right">
                   <button type="button" onClick={() => toggleSort('students')} className="hover:text-zinc-800 uppercase">
                     Population{sortCaret('students')}
@@ -309,11 +269,6 @@ export function SchoolsRegistryView() {
                 <th className="py-2.5 px-3">
                   <button type="button" onClick={() => toggleSort('storageUsedGb')} className="hover:text-zinc-800 uppercase">
                     Storage{sortCaret('storageUsedGb')}
-                  </button>
-                </th>
-                <th className="py-2.5 px-3 text-right">
-                  <button type="button" onClick={() => toggleSort('monthlyFeeNgn')} className="hover:text-zinc-800 uppercase">
-                    Monthly{sortCaret('monthlyFeeNgn')}
                   </button>
                 </th>
                 <th className="py-2.5 px-3 text-center">Status</th>
@@ -333,11 +288,6 @@ export function SchoolsRegistryView() {
                         <span className="text-zinc-500">{tenant.domain}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-3">
-                      <span className={`inline-block px-2 py-0.5 rounded-md border font-semibold text-[11px] ${TIER_STYLES[tenant.tier]}`}>
-                        {tenant.tierLabel}
-                      </span>
-                    </td>
                     <td className="py-3 px-3 text-right">
                       <div className="font-bold text-zinc-900">{tenant.students.toLocaleString()}</div>
                       <div className="text-[11px] text-zinc-400">{tenant.teachers} faculty</div>
@@ -355,9 +305,6 @@ export function SchoolsRegistryView() {
                       <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
                         {tenant.storageUsedGb.toFixed(1)} / {tenant.storageQuotaGb} GB
                       </div>
-                    </td>
-                    <td className="py-3 px-3 text-right font-mono text-[11px] text-zinc-600">
-                      {tenant.monthlyFeeNgn === 0 ? '—' : `₦${tenant.monthlyFeeNgn.toLocaleString()}`}
                     </td>
                     <td className="py-3 px-3 text-center">
                       <span
@@ -426,9 +373,6 @@ export function SchoolsRegistryView() {
                 <span className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-extrabold uppercase tracking-wider ${TENANT_STATUS_STYLES[selected.status]}`}>
                   {selected.status}
                 </span>
-                <span className={`inline-block px-2 py-0.5 rounded-md border font-semibold text-[11px] ${TIER_STYLES[selected.tier]}`}>
-                  {selected.tierLabel}
-                </span>
               </div>
 
               <div className="rounded-xl border border-zinc-200 divide-y divide-zinc-100">
@@ -438,10 +382,8 @@ export function SchoolsRegistryView() {
                   ['Campus City', selected.city],
                   ['Enrolled Students', selected.students.toLocaleString()],
                   ['Faculty & Staff', selected.teachers.toLocaleString()],
-                  ['Storage Usage', `${selected.storageUsedGb.toFixed(1)} GB of ${selected.storageQuotaGb} GB`],
-                  ['Monthly Subscription', selected.monthlyFeeNgn === 0 ? 'Trial — no charge' : `₦${selected.monthlyFeeNgn.toLocaleString()}`],
+                  ['Storage Usage', `${selected.storageUsedGb.toFixed(1)} GB of ${selected.storageQuotaGb.toLocaleString()} GB`],
                   ['Onboarded On', selected.onboardedOn],
-                  ['Renews On', selected.renewsOn],
                   ['Last Activity', selected.lastActivity],
                 ].map(([label, value]) => (
                   <div key={label} className="flex items-start justify-between gap-3 px-3 py-2.5">
@@ -463,10 +405,10 @@ export function SchoolsRegistryView() {
             <div className="p-5 border-t border-zinc-200 bg-zinc-50 grid grid-cols-2 gap-2.5">
               <button
                 type="button"
-                onClick={() => setTierTarget(selected)}
+                onClick={() => setQuotaTarget(selected)}
                 className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-white/60 transition-colors shadow-sm"
               >
-                Change Tier
+                Adjust Quota
               </button>
               <button
                 type="button"
@@ -491,13 +433,6 @@ export function SchoolsRegistryView() {
               </button>
               <button
                 type="button"
-                onClick={() => setBillingTarget(selected)}
-                className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-white/60 transition-colors shadow-sm"
-              >
-                Billing History
-              </button>
-              <button
-                type="button"
                 onClick={() =>
                   setConfirmRequest({
                     eyebrow: 'Tenant Status',
@@ -508,8 +443,8 @@ export function SchoolsRegistryView() {
                     body:
                       selected.status === 'suspended' ? (
                         <>
-                          <strong>{selected.name}</strong> regains access immediately. Billing resumes at ₦
-                          {selected.monthlyFeeNgn.toLocaleString()} per month from the next cycle.
+                          <strong>{selected.name}</strong> regains access immediately and its campus portals come
+                          back online.
                         </>
                       ) : (
                         <>
@@ -539,22 +474,13 @@ export function SchoolsRegistryView() {
         />
       )}
 
-      {tierTarget && (
-        <ChangeTierModal
-          tenant={tierTarget}
-          onClose={() => setTierTarget(null)}
-          onApply={(tier) => handleTierChange(tierTarget, tier)}
+      {quotaTarget && (
+        <StorageQuotaModal
+          tenant={quotaTarget}
+          onClose={() => setQuotaTarget(null)}
+          onApply={(quota) => handleQuotaChange(quotaTarget, quota)}
         />
       )}
-
-      {billingTarget && (
-        <BillingHistoryModal
-          tenant={billingTarget}
-          onClose={() => setBillingTarget(null)}
-          onExported={(fileName) => notify(`Billing history exported to ${fileName}.`)}
-        />
-      )}
-
       {confirmRequest && (
         <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
       )}

@@ -47,8 +47,8 @@ const INITIAL_AUDIT_LOGS: AuditLog[] = [
     schoolName: 'Evergreen Institute of Technology',
     ipAddress: '192.168.1.100',
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0',
-    description: 'Provisioned new school tenant #18 on Starter Campus tier.',
-    details: { tenant_id: 18, code: 'EIT-SMTS-018', plan: 'starter-campus', admin_assigned: true },
+    description: 'Provisioned new school tenant #18 with a 250 GB storage quota.',
+    details: { tenant_id: 18, code: 'EIT-SMTS-018', storage_quota_gb: 250, admin_assigned: true },
   },
   {
     id: 3,
@@ -68,8 +68,8 @@ const INITIAL_AUDIT_LOGS: AuditLog[] = [
   {
     id: 4,
     timestamp: '2026-09-23 16:00:45',
-    eventType: 'plan.upgraded',
-    action: 'Upgraded Tenant Subscription',
+    eventType: 'tenant.quota_raised',
+    action: 'Raised Tenant Storage Quota',
     severity: 'info',
     actorName: 'Alexander Cross',
     actorEmail: 'admin@lincolnplatform.io',
@@ -77,8 +77,8 @@ const INITIAL_AUDIT_LOGS: AuditLog[] = [
     schoolName: 'Lincoln College of Science Management & Technology',
     ipAddress: '192.168.1.100',
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0',
-    description: 'Elevated Lincoln College from Pro Academic to Enterprise University tier.',
-    details: { old_plan: 'pro-academic', new_plan: 'enterprise-university', billing_amount: 9990.0 },
+    description: 'Raised Lincoln College storage quota from 500 GB to 1 TB.',
+    details: { old_quota_gb: 500, new_quota_gb: 1000, reason: 'Archive migration' },
   },
   {
     id: 5,
@@ -92,8 +92,8 @@ const INITIAL_AUDIT_LOGS: AuditLog[] = [
     schoolName: 'Vanguard Institute of Sciences',
     ipAddress: '192.168.1.100',
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0',
-    description: 'Suspended Vanguard Institute account due to unresolved billing delinquency past 60 days.',
-    details: { tenant_id: 20, invoice: 'INV-PASTDUE-020', reason: 'Billing past 60 days' },
+    description: 'Suspended Vanguard Institute account after 180 days with no sign-in activity.',
+    details: { tenant_id: 20, inactive_days: 180, reason: 'Dormant tenant policy' },
   },
   {
     id: 6,
@@ -270,7 +270,6 @@ export default function SecurityAuditLogsPage() {
               <option value="all">All Event Categories</option>
               <option value="auth">Authentication (auth.*)</option>
               <option value="tenant">Tenancy (tenant.*)</option>
-              <option value="plan">Billing &amp; Plans (plan.*)</option>
               <option value="platform">Platform Policy (platform.*)</option>
               <option value="user">User Lifecycle (user.*)</option>
             </select>

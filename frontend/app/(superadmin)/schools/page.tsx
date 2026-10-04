@@ -4,7 +4,7 @@ import { SchoolsRegistryView } from '@/modules/superadmin/components';
 
 export const metadata: Metadata = {
   title: 'Schools (Tenants) | Lincoln Multi-Tenant Academic Platform',
-  description: 'Tenant registry for every enrolled institution, with subscription tier, population, storage, and billing posture.',
+  description: 'Tenant registry for every enrolled institution, with population, storage usage, and governance status.',
 };
 
 export default function SchoolsPage() {

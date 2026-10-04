@@ -320,7 +320,7 @@ export function CreateApiKeyModal({ onClose, onCreate, existingLabels }: CreateA
     const trimmed = label.trim();
 
     if (trimmed.length < 4) {
-      setError('Give the key a recognisable label, e.g. "Billing Worker".');
+      setError('Give the key a recognisable label, e.g. "Attendance Sync".');
       return;
     }
     if (existingLabels.map((item) => item.toLowerCase()).includes(trimmed.toLowerCase())) {

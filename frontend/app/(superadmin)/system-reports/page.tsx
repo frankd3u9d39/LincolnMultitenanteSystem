@@ -24,7 +24,6 @@ const TELEMETRY_7_DAYS: TelemetryDay[] = [
 interface TenantReport {
   name: string;
   code: string;
-  plan: string;
   students: number;
   attendancePct: number;
   storageMb: number;
@@ -32,12 +31,12 @@ interface TenantReport {
 }
 
 const TOP_TENANTS: TenantReport[] = [
-  { name: 'Lincoln College of Science Management & Technology', code: 'LC-SMTS-001', plan: 'Enterprise University', students: 1240, attendancePct: 94.6, storageMb: 142350, complianceScore: 99 },
-  { name: 'Cambridge International College', code: 'CIC-SMTS-005', plan: 'Enterprise University', students: 1890, attendancePct: 95.8, storageMb: 215400, complianceScore: 98 },
-  { name: 'Horizon STEM Institute', code: 'HZ-SMTS-003', plan: 'Enterprise University', students: 1450, attendancePct: 96.2, storageMb: 110400, complianceScore: 100 },
-  { name: 'St. Augustine Science & Arts Academy', code: 'SA-SMTS-002', plan: 'Pro Academic', students: 980, attendancePct: 92.1, storageMb: 48200, complianceScore: 96 },
-  { name: 'Kingsway Polytechnic', code: 'KP-SMTS-004', plan: 'Pro Academic', students: 820, attendancePct: 89.8, storageMb: 62100, complianceScore: 94 },
-  { name: 'Apex Advanced Science Academy', code: 'AASA-SMTS-006', plan: 'Pro Academic', students: 740, attendancePct: 93.4, storageMb: 39400, complianceScore: 97 },
+  { name: 'Lincoln College of Science Management & Technology', code: 'LC-SMTS-001', students: 1240, attendancePct: 94.6, storageMb: 142350, complianceScore: 99 },
+  { name: 'Cambridge International College', code: 'CIC-SMTS-005', students: 1890, attendancePct: 95.8, storageMb: 215400, complianceScore: 98 },
+  { name: 'Horizon STEM Institute', code: 'HZ-SMTS-003', students: 1450, attendancePct: 96.2, storageMb: 110400, complianceScore: 100 },
+  { name: 'St. Augustine Science & Arts Academy', code: 'SA-SMTS-002', students: 980, attendancePct: 92.1, storageMb: 48200, complianceScore: 96 },
+  { name: 'Kingsway Polytechnic', code: 'KP-SMTS-004', students: 820, attendancePct: 89.8, storageMb: 62100, complianceScore: 94 },
+  { name: 'Apex Advanced Science Academy', code: 'AASA-SMTS-006', students: 740, attendancePct: 93.4, storageMb: 39400, complianceScore: 97 },
 ];
 
 export default function SystemReportsPage() {
@@ -202,48 +201,47 @@ export default function SystemReportsPage() {
           </div>
         </div>
 
-        {/* Right: Revenue Breakdown & Compliance */}
+        {/* Right: Capacity Breakdown & Compliance */}
         <div className="lg:col-span-4 space-y-6">
           <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-zinc-900">Subscription Tier Distribution</h3>
+            <h3 className="text-sm font-bold text-zinc-900">Campus Size Distribution</h3>
 
             <div className="space-y-3">
               <div>
                 <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span className="text-zinc-700">Enterprise University (6 Schools)</span>
-                  <span className="font-bold text-zinc-900">₦59,940 / mo</span>
+                  <span className="text-zinc-700">Large (1,000+ students)</span>
+                  <span className="font-bold text-zinc-900">6 schools</span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-zinc-100 overflow-hidden">
-                  <div className="h-full bg-[#B81D22] rounded-full" style={{ width: '66%' }} />
+                  <div className="h-full bg-[#B81D22] rounded-full" style={{ width: '30%' }} />
                 </div>
               </div>
 
               <div>
                 <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span className="text-zinc-700">Pro Academic (11 Schools)</span>
-                  <span className="font-bold text-zinc-900">₦27,445 / mo</span>
+                  <span className="text-zinc-700">Medium (500 - 999 students)</span>
+                  <span className="font-bold text-zinc-900">7 schools</span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-zinc-100 overflow-hidden">
-                  <div className="h-full bg-amber-500 rounded-full" style={{ width: '30%' }} />
+                  <div className="h-full bg-blue-500 rounded-full" style={{ width: '35%' }} />
                 </div>
               </div>
 
               <div>
                 <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span className="text-zinc-700">Starter Campus (3 Schools)</span>
-                  <span className="font-bold text-zinc-900">₦3,162 / mo</span>
+                  <span className="text-zinc-700">Small (under 500 students)</span>
+                  <span className="font-bold text-zinc-900">7 schools</span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-zinc-100 overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: '4%' }} />
+                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: '35%' }} />
                 </div>
               </div>
             </div>
 
-            <div className="pt-3 border-t border-zinc-100 text-xs text-zinc-500">
-              Total Gross Recurring: <strong className="text-zinc-900">₦90,547 / month</strong>
+            <div className="pt-3 border-t border-zinc-100 text-[11px] text-zinc-500">
+              All <strong className="text-zinc-900">20 schools</strong> run the full feature set at no cost.
             </div>
           </div>
-
           {/* Quick Compliance Card */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm space-y-3">
             <div className="flex items-center gap-2">
@@ -275,7 +273,6 @@ export default function SystemReportsPage() {
             <thead className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 font-semibold uppercase text-[10px] tracking-wider">
               <tr>
                 <th className="py-2.5 px-3">Institution</th>
-                <th className="py-2.5 px-3">Subscription Tier</th>
                 <th className="py-2.5 px-3 text-right">Students</th>
                 <th className="py-2.5 px-3 text-right">Attendance Rate</th>
                 <th className="py-2.5 px-3 text-right">Storage Used</th>
@@ -288,11 +285,6 @@ export default function SystemReportsPage() {
                   <td className="py-3 px-3">
                     <div className="font-bold text-zinc-900 truncate max-w-[240px]">{tenant.name}</div>
                     <div className="text-[11px] font-mono text-zinc-400">{tenant.code}</div>
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className="px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 font-medium text-[11px]">
-                      {tenant.plan}
-                    </span>
                   </td>
                   <td className="py-3 px-3 text-right font-bold text-zinc-900">
                     {tenant.students.toLocaleString()}

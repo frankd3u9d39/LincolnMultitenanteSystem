@@ -1,220 +1,131 @@
 'use client';
 
 import React, { useState } from 'react';
-import { SchoolTenant, SubscriptionTier } from '../types';
+import { SchoolTenant } from '../types';
 import { ModalPrimaryButton, ModalSecondaryButton, ModalShell } from './ModalShell';
-import {
-  INVOICE_STATUS_STYLES,
-  TIER_PRESETS,
-  TIER_STYLES,
-  billingHistoryFor,
-  downloadCsv,
-} from '../utils';
+import { storageUsagePercent } from '../utils';
 
-interface ChangeTierModalProps {
+interface StorageQuotaModalProps {
   tenant: SchoolTenant;
   onClose: () => void;
-  onApply: (tier: SubscriptionTier) => void;
+  onApply: (storageQuotaGb: number) => void;
 }
 
-/** Moves a tenant between subscription tiers, showing the quota and billing impact first. */
-export function ChangeTierModal({ tenant, onClose, onApply }: ChangeTierModalProps) {
-  const [tier, setTier] = useState<SubscriptionTier>(tenant.tier);
-  const preset = TIER_PRESETS[tier];
-  const changed = tier !== tenant.tier;
-  const feeDelta = preset.monthlyFeeNgn - tenant.monthlyFeeNgn;
-  const overCapacity = tenant.students > preset.maxStudents || tenant.storageUsedGb > preset.storageQuotaGb;
+const PRESET_QUOTAS = [50, 250, 500, 1000, 2000];
+
+/** Raises or lowers a single tenant's storage ceiling. */
+export function StorageQuotaModal({ tenant, onClose, onApply }: StorageQuotaModalProps) {
+  const [quota, setQuota] = useState(tenant.storageQuotaGb);
+  const [error, setError] = useState('');
+
+  const changed = quota !== tenant.storageQuotaGb;
+  const belowUsage = quota < tenant.storageUsedGb;
+  const projectedUsage = quota === 0 ? 0 : Math.min(100, (tenant.storageUsedGb / quota) * 100);
+
+  const handleApply = () => {
+    if (quota < 1) {
+      setError('Allocate at least 1 GB.');
+      return;
+    }
+    if (belowUsage) {
+      setError(`Below the ${tenant.storageUsedGb.toFixed(1)} GB already stored by this school.`);
+      return;
+    }
+    onApply(quota);
+    onClose();
+  };
 
   return (
     <ModalShell
-      eyebrow="Subscription"
-      title="Change Tier"
-      subtitle={tenant.name}
+      eyebrow="Resource Limits"
+      title="Adjust Storage Quota"
+      subtitle={`${tenant.name} • ${tenant.code}`}
       onClose={onClose}
       footer={
         <>
           <ModalSecondaryButton onClick={onClose}>Cancel</ModalSecondaryButton>
-          <ModalPrimaryButton
-            disabled={!changed || overCapacity}
-            onClick={() => {
-              onApply(tier);
-              onClose();
-            }}
-          >
-            Apply Tier Change
+          <ModalPrimaryButton onClick={handleApply} disabled={!changed || belowUsage}>
+            Apply Quota
           </ModalPrimaryButton>
         </>
       }
     >
       <div className="space-y-4">
-        <div className="space-y-2.5">
-          {(Object.keys(TIER_PRESETS) as SubscriptionTier[]).map((option) => {
-            const optionPreset = TIER_PRESETS[option];
-            const tooSmall =
-              tenant.students > optionPreset.maxStudents || tenant.storageUsedGb > optionPreset.storageQuotaGb;
-
-            return (
-              <label
-                key={option}
-                className={`flex items-start gap-3 rounded-xl border p-3.5 transition-all ${
-                  tooSmall
-                    ? 'border-zinc-200 bg-zinc-50/60 cursor-not-allowed opacity-60'
-                    : tier === option
-                    ? 'border-[#B81D22] bg-red-50/40 ring-2 ring-red-600/10 cursor-pointer'
-                    : 'border-zinc-200 hover:bg-zinc-50/60 cursor-pointer'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="tenant-tier"
-                  value={option}
-                  checked={tier === option}
-                  disabled={tooSmall}
-                  onChange={() => setTier(option)}
-                  className="mt-0.5 w-4 h-4 accent-[#B81D22] shrink-0"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-zinc-900">{optionPreset.label}</span>
-                    {option === tenant.tier && (
-                      <span className="px-2 py-0.5 rounded-full bg-zinc-200 text-zinc-700 text-[10px] font-extrabold uppercase shrink-0">
-                        Current
-                      </span>
-                    )}
-                  </span>
-                  <span className="block text-[11px] text-zinc-500 mt-0.5">
-                    ₦{optionPreset.monthlyFeeNgn.toLocaleString()} / month &bull;{' '}
-                    {optionPreset.maxStudents.toLocaleString()} students &bull; {optionPreset.storageQuotaGb} GB
-                  </span>
-                  {tooSmall && (
-                    <span className="block text-[11px] font-semibold text-red-600 mt-1">
-                      Below this tenant&apos;s current usage ({tenant.students.toLocaleString()} students,{' '}
-                      {tenant.storageUsedGb.toFixed(1)} GB).
-                    </span>
-                  )}
-                </span>
-              </label>
-            );
-          })}
+        <div className="rounded-xl border border-zinc-200 p-3.5">
+          <div className="flex items-center justify-between text-xs mb-2">
+            <span className="text-zinc-500">Currently stored</span>
+            <span className="font-bold text-zinc-900">
+              {tenant.storageUsedGb.toFixed(1)} GB of {tenant.storageQuotaGb} GB
+            </span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-zinc-100 overflow-hidden">
+            <div
+              className={`h-full rounded-full ${
+                storageUsagePercent(tenant) > 85
+                  ? 'bg-red-500'
+                  : storageUsagePercent(tenant) > 60
+                  ? 'bg-amber-500'
+                  : 'bg-emerald-500'
+              }`}
+              style={{ width: `${storageUsagePercent(tenant)}%` }}
+            />
+          </div>
         </div>
 
-        {changed && (
+        <div>
+          <label
+            className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5"
+            htmlFor="tenant-quota"
+          >
+            New Quota (GB)
+          </label>
+          <input
+            id="tenant-quota"
+            type="text"
+            inputMode="numeric"
+            value={quota.toLocaleString()}
+            onChange={(e) => {
+              setQuota(Number(e.target.value.replace(/[^0-9]/g, '')) || 0);
+              setError('');
+            }}
+            className={`w-full px-3 py-2 text-xs rounded-xl border bg-white text-zinc-800 focus:outline-none focus:ring-2 transition-all ${
+              error
+                ? 'border-red-400 focus:ring-red-500/20 focus:border-red-500'
+                : 'border-zinc-200 focus:ring-[#B81D22]/20 focus:border-[#B81D22]'
+            }`}
+          />
+          {error && <p className="mt-1 text-[11px] font-semibold text-red-600">{error}</p>}
+
+          <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+            {PRESET_QUOTAS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => {
+                  setQuota(preset);
+                  setError('');
+                }}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-colors ${
+                  quota === preset
+                    ? 'border-[#B81D22] bg-red-50 text-[#B81D22]'
+                    : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'
+                }`}
+              >
+                {preset >= 1000 ? `${preset / 1000} TB` : `${preset} GB`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {changed && !belowUsage && (
           <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 text-[11px] text-blue-900 leading-relaxed">
-            <p className="font-bold uppercase tracking-wider text-[11px]">Billing impact</p>
+            <p className="font-bold uppercase tracking-wider">After this change</p>
             <p className="mt-1">
-              Monthly charge moves from ₦{tenant.monthlyFeeNgn.toLocaleString()} to ₦
-              {preset.monthlyFeeNgn.toLocaleString()} ({feeDelta >= 0 ? '+' : '−'}₦
-              {Math.abs(feeDelta).toLocaleString()}). Storage quota becomes {preset.storageQuotaGb} GB and the
-              change is prorated from the next invoice on {tenant.renewsOn}.
+              {tenant.name} would be at {projectedUsage.toFixed(1)}% of its {quota.toLocaleString()} GB allocation.
+              The new ceiling applies to uploads immediately.
             </p>
           </div>
         )}
-      </div>
-    </ModalShell>
-  );
-}
-
-interface BillingHistoryModalProps {
-  tenant: SchoolTenant;
-  onClose: () => void;
-  onExported: (fileName: string) => void;
-}
-
-/** Recent invoices for a tenant, with a working CSV export. */
-export function BillingHistoryModal({ tenant, onClose, onExported }: BillingHistoryModalProps) {
-  const invoices = billingHistoryFor(tenant);
-  const totalPaid = invoices
-    .filter((invoice) => invoice.status === 'paid')
-    .reduce((sum, invoice) => sum + invoice.amountNgn, 0);
-  const totalDue = invoices
-    .filter((invoice) => invoice.status === 'due')
-    .reduce((sum, invoice) => sum + invoice.amountNgn, 0);
-
-  const handleExport = () => {
-    const fileName = downloadCsv(
-      `billing_${tenant.code}`,
-      ['Reference', 'Issued On', 'Period', 'Amount (NGN)', 'Status', 'Method'],
-      invoices.map((invoice) => [
-        invoice.reference,
-        invoice.issuedOn,
-        invoice.periodLabel,
-        invoice.amountNgn,
-        invoice.status,
-        invoice.method,
-      ])
-    );
-    onExported(fileName);
-  };
-
-  return (
-    <ModalShell
-      eyebrow="Billing"
-      title="Billing History"
-      subtitle={`${tenant.name} • ${tenant.code}`}
-      onClose={onClose}
-      widthClass="max-w-2xl"
-      footer={
-        <>
-          <ModalSecondaryButton onClick={handleExport}>Export CSV</ModalSecondaryButton>
-          <ModalPrimaryButton onClick={onClose}>Done</ModalPrimaryButton>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <div className="grid grid-cols-3 gap-3 text-xs">
-          <div className="rounded-xl border border-zinc-200 p-3">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-zinc-500">Settled</span>
-            <div className="mt-1 text-base font-black text-emerald-700">₦{totalPaid.toLocaleString()}</div>
-          </div>
-          <div className="rounded-xl border border-zinc-200 p-3">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-zinc-500">Outstanding</span>
-            <div className={`mt-1 text-base font-black ${totalDue > 0 ? 'text-red-700' : 'text-zinc-900'}`}>
-              ₦{totalDue.toLocaleString()}
-            </div>
-          </div>
-          <div className="rounded-xl border border-zinc-200 p-3">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-zinc-500">Current Tier</span>
-            <div className="mt-1.5">
-              <span className={`inline-block px-2 py-0.5 rounded-md border font-semibold text-[11px] ${TIER_STYLES[tenant.tier]}`}>
-                {tenant.tierLabel}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto rounded-xl border border-zinc-100">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-50 border-b border-zinc-200/80 text-zinc-500 font-semibold uppercase text-[10px] tracking-wider">
-              <tr>
-                <th className="py-2.5 px-3">Reference</th>
-                <th className="py-2.5 px-3">Period</th>
-                <th className="py-2.5 px-3 text-right">Amount</th>
-                <th className="py-2.5 px-3">Method</th>
-                <th className="py-2.5 px-3 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100 text-zinc-700">
-              {invoices.map((invoice) => (
-                <tr key={invoice.reference} className="hover:bg-zinc-50/60 transition-colors">
-                  <td className="py-3 px-3 font-mono text-[11px] text-zinc-600">{invoice.reference}</td>
-                  <td className="py-3 px-3">
-                    <div className="font-semibold text-zinc-900">{invoice.periodLabel}</div>
-                    <div className="text-[11px] text-zinc-400 font-mono">Issued {invoice.issuedOn}</div>
-                  </td>
-                  <td className="py-3 px-3 text-right font-bold text-zinc-900">
-                    {invoice.amountNgn === 0 ? '—' : `₦${invoice.amountNgn.toLocaleString()}`}
-                  </td>
-                  <td className="py-3 px-3 text-zinc-500">{invoice.method}</td>
-                  <td className="py-3 px-3 text-center">
-                    <span className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-extrabold uppercase tracking-wider ${INVOICE_STATUS_STYLES[invoice.status]}`}>
-                      {invoice.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
     </ModalShell>
   );

@@ -25,14 +25,14 @@ const INITIAL_STATE: GlobalSettingsState = {
   notifications: {
     tenantOnboarded: true,
     tenantSuspended: true,
-    billingFailures: true,
+    quotaBreaches: true,
     securityAlerts: true,
     backupResults: false,
     weeklyDigest: true,
     channel: 'email_sms',
   },
   apiKeys: [
-    { id: 1, label: 'Billing Reconciliation Worker', prefix: 'lmp_live_8f2a', scope: 'read_only', createdOn: '2025-02-11', lastUsed: '2026-10-04 06:00', status: 'active' },
+    { id: 1, label: 'Attendance Sync Worker', prefix: 'lmp_live_8f2a', scope: 'read_only', createdOn: '2025-02-11', lastUsed: '2026-10-04 06:00', status: 'active' },
     { id: 2, label: 'Tenant Provisioning Pipeline', prefix: 'lmp_live_c41d', scope: 'read_write', createdOn: '2025-06-03', lastUsed: '2026-10-03 22:14', status: 'active' },
     { id: 3, label: 'Analytics Warehouse Sync', prefix: 'lmp_live_19be', scope: 'read_only', createdOn: '2024-10-28', lastUsed: '2026-10-04 02:30', status: 'active' },
     { id: 4, label: 'Legacy Migration Script', prefix: 'lmp_live_7700', scope: 'admin', createdOn: '2023-05-14', lastUsed: '2024-01-09 11:42', status: 'revoked' },
@@ -57,10 +57,10 @@ const NOTIFICATION_ROWS: Array<{
 }> = [
   { key: 'tenantOnboarded', title: 'Tenant Onboarded', description: 'A new school completes provisioning and verification.' },
   { key: 'tenantSuspended', title: 'Tenant Suspended', description: 'A school is suspended automatically or manually.' },
-  { key: 'billingFailures', title: 'Billing Failures', description: 'A subscription charge is declined or goes overdue.' },
+  { key: 'quotaBreaches', title: 'Quota Breaches', description: 'A school reaches its storage or enrolment ceiling.' },
   { key: 'securityAlerts', title: 'Security Alerts', description: 'Brute-force attempts, flagged IPs, or privilege escalations.' },
   { key: 'backupResults', title: 'Backup Results', description: 'Outcome of every scheduled platform snapshot.' },
-  { key: 'weeklyDigest', title: 'Weekly Platform Digest', description: 'Monday summary of growth, revenue, and incidents.' },
+  { key: 'weeklyDigest', title: 'Weekly Platform Digest', description: 'Monday summary of growth, capacity, and incidents.' },
 ];
 
 const SCOPE_STYLES: Record<ApiAccessKey['scope'], string> = {
