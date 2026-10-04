@@ -67,14 +67,13 @@ export default function SuperAdminDashboardPage() {
           >
             Audit Trail
           </Link>
-          <button
-            type="button"
-            onClick={() => alert('School Provisioning Modal will be enabled in next release.')}
+          <Link
+            href="/schools?onboard=1"
             className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 flex items-center gap-1.5"
           >
             <span className="text-base leading-none">+</span>
             <span>Onboard School</span>
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -275,13 +274,12 @@ export default function SuperAdminDashboardPage() {
                       </span>
                     </td>
                     <td className="py-3 px-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => alert(`Managing tenant ${school.name}`)}
+                      <Link
+                        href={`/schools?tenant=${school.code}`}
                         className="text-[11px] font-semibold text-[#B81D22] hover:underline"
                       >
                         Manage
-                      </button>
+                      </Link>
                     </td>
                   </tr>
                 ))}

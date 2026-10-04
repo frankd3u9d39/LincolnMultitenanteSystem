@@ -2,6 +2,15 @@
 
 import React, { useState } from 'react';
 import { ApiAccessKey, GlobalSettingsState } from '../types';
+import { useNotice } from '../hooks';
+import { NoticeBanner } from './NoticeBanner';
+import { ConfirmDialog, ConfirmRequest } from './ConfirmDialog';
+import {
+  ChangePasswordModal,
+  CreateApiKeyModal,
+  MfaEnrolmentModal,
+  RecoveryCodesModal,
+} from './AccountSecurityDialogs';
 
 const INITIAL_STATE: GlobalSettingsState = {
   profile: {
@@ -66,6 +75,20 @@ const SCOPE_LABELS: Record<ApiAccessKey['scope'], string> = {
   admin: 'Full admin',
 };
 
+interface ActiveSession {
+  device: string;
+  location: string;
+  ip: string;
+  seen: string;
+  current: boolean;
+}
+
+const INITIAL_SESSIONS: ActiveSession[] = [
+  { device: 'Chrome 141 on Windows 11', location: 'Lagos, Nigeria', ip: '197.210.54.12', seen: 'Current session', current: true },
+  { device: 'Safari on iPhone 16 Pro', location: 'Lagos, Nigeria', ip: '105.112.18.44', seen: '3 hours ago', current: false },
+  { device: 'Edge 140 on Windows 11', location: 'Abuja, Nigeria', ip: '102.89.33.17', seen: '2 days ago', current: false },
+];
+
 type Tab = 'profile' | 'notifications' | 'security' | 'api';
 
 const TABS: Array<{ id: Tab; label: string }> = [
@@ -79,6 +102,20 @@ export function GlobalSettingsView() {
   const [activeTab, setActiveTab] = useState<Tab>('profile');
   const [state, setState] = useState<GlobalSettingsState>(INITIAL_STATE);
   const [savedAlert, setSavedAlert] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [mfaOpen, setMfaOpen] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [newKeyOpen, setNewKeyOpen] = useState(false);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const [sessions, setSessions] = useState(INITIAL_SESSIONS);
+  const [mfaEnrolledOn, setMfaEnrolledOn] = useState('Authenticator app');
+  const { notice, notify, dismiss } = useNotice();
+
+  const signOutOtherSessions = () => {
+    const removed = sessions.filter((session) => !session.current).length;
+    setSessions((prev) => prev.filter((session) => session.current));
+    notify(`Signed out ${removed} other device${removed === 1 ? '' : 's'}. Only this session remains active.`, 'warning');
+  };
 
   const handleProfileChange = <K extends keyof GlobalSettingsState['profile']>(
     key: K,
@@ -133,6 +170,8 @@ export function GlobalSettingsView() {
           </button>
         </div>
       </div>
+
+      <NoticeBanner notice={notice} onDismiss={dismiss} />
 
       {savedAlert && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 flex items-center gap-2">
@@ -395,7 +434,7 @@ export function GlobalSettingsView() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => alert('Password change flow opens on a dedicated secure screen.')}
+                  onClick={() => setPasswordOpen(true)}
                   className="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shrink-0"
                 >
                   Change
@@ -410,11 +449,11 @@ export function GlobalSettingsView() {
                       Enrolled
                     </span>
                   </div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5">Authenticator app &bull; 8 recovery codes remaining</div>
+                  <div className="text-[11px] text-zinc-500 mt-0.5">{mfaEnrolledOn} &bull; 8 recovery codes remaining</div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => alert('MFA re-enrolment requires confirming your current factor first.')}
+                  onClick={() => setMfaOpen(true)}
                   className="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shrink-0"
                 >
                   Re-enrol
@@ -428,7 +467,21 @@ export function GlobalSettingsView() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => alert('New recovery codes are shown once on a dedicated secure screen.')}
+                  onClick={() =>
+                    setConfirmRequest({
+                      eyebrow: 'Sign-in Security',
+                      title: 'Regenerate recovery codes?',
+                      confirmLabel: 'Regenerate',
+                      tone: 'danger',
+                      body: (
+                        <>
+                          Your 8 existing recovery codes stop working immediately. A fresh set is shown once, and
+                          you will need to store it somewhere safe.
+                        </>
+                      ),
+                      onConfirm: () => setRecoveryOpen(true),
+                    })
+                  }
                   className="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shrink-0"
                 >
                   Regenerate
@@ -445,7 +498,22 @@ export function GlobalSettingsView() {
               </div>
               <button
                 type="button"
-                onClick={() => alert('All other sessions have been signed out.')}
+                onClick={() =>
+                  setConfirmRequest({
+                    eyebrow: 'Sign-in Security',
+                    title: 'Sign out other devices?',
+                    confirmLabel: 'Sign Out Others',
+                    tone: 'danger',
+                    body: (
+                      <>
+                        {sessions.filter((session) => !session.current).length} other device
+                        {sessions.filter((session) => !session.current).length === 1 ? '' : 's'} will be signed
+                        out at once. This device stays signed in.
+                      </>
+                    ),
+                    onConfirm: signOutOtherSessions,
+                  })
+                }
                 className="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shrink-0"
               >
                 Sign out others
@@ -453,11 +521,7 @@ export function GlobalSettingsView() {
             </div>
 
             <div className="space-y-2.5 text-xs">
-              {[
-                { device: 'Chrome 141 on Windows 11', location: 'Lagos, Nigeria', ip: '197.210.54.12', seen: 'Current session', current: true },
-                { device: 'Safari on iPhone 16 Pro', location: 'Lagos, Nigeria', ip: '105.112.18.44', seen: '3 hours ago', current: false },
-                { device: 'Edge 140 on Windows 11', location: 'Abuja, Nigeria', ip: '102.89.33.17', seen: '2 days ago', current: false },
-              ].map((session) => (
+              {sessions.map((session) => (
                 <div
                   key={session.ip}
                   className={`rounded-xl border p-3.5 ${session.current ? 'border-emerald-200 bg-emerald-50/50' : 'border-zinc-200 bg-zinc-50/50'}`}
@@ -493,7 +557,7 @@ export function GlobalSettingsView() {
             </div>
             <button
               type="button"
-              onClick={() => alert('New key creation shows the full secret once, on a dedicated screen.')}
+              onClick={() => setNewKeyOpen(true)}
               className="px-3.5 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 shrink-0"
             >
               Create New Key
@@ -540,7 +604,24 @@ export function GlobalSettingsView() {
                       {key.status === 'active' ? (
                         <button
                           type="button"
-                          onClick={() => handleRevokeKey(key.id)}
+                          onClick={() =>
+                            setConfirmRequest({
+                              eyebrow: 'API Access',
+                              title: 'Revoke this key?',
+                              confirmLabel: 'Revoke Key',
+                              tone: 'danger',
+                              body: (
+                                <>
+                                  <strong>{key.label}</strong> stops authenticating on its next request and cannot
+                                  be restored. Integrations using it will start returning 401 responses.
+                                </>
+                              ),
+                              onConfirm: () => {
+                                handleRevokeKey(key.id);
+                                notify(`${key.label} revoked. Issue a replacement key before the integration next runs.`, 'warning');
+                              },
+                            })
+                          }
                           className="text-[11px] font-semibold text-[#B81D22] hover:underline"
                         >
                           Revoke
@@ -563,6 +644,41 @@ export function GlobalSettingsView() {
             </p>
           </div>
         </div>
+      )}
+      {passwordOpen && (
+        <ChangePasswordModal
+          onClose={() => setPasswordOpen(false)}
+          onChanged={() => notify('Password updated. Your other devices have been signed out.')}
+        />
+      )}
+
+      {mfaOpen && (
+        <MfaEnrolmentModal
+          onClose={() => setMfaOpen(false)}
+          onEnrolled={() => {
+            setMfaEnrolledOn('Authenticator app (re-enrolled today)');
+            notify('Authenticator replaced. Your previous factor no longer works.');
+          }}
+        />
+      )}
+
+      {recoveryOpen && (
+        <RecoveryCodesModal onClose={() => setRecoveryOpen(false)} onNotify={(message) => notify(message)} />
+      )}
+
+      {newKeyOpen && (
+        <CreateApiKeyModal
+          onClose={() => setNewKeyOpen(false)}
+          existingLabels={state.apiKeys.map((key) => key.label)}
+          onCreate={(key) => {
+            setState((prev) => ({ ...prev, apiKeys: [key, ...prev.apiKeys] }));
+            notify(`${key.label} created. Copy the secret now — it is not shown again.`);
+          }}
+        />
+      )}
+
+      {confirmRequest && (
+        <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
       )}
     </form>
   );

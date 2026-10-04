@@ -2,6 +2,11 @@
 
 import React, { useMemo, useState } from 'react';
 import { SystemUser, SystemUserRole, SystemUserStatus } from '../types';
+import { useNotice } from '../hooks';
+import { downloadCsv } from '../utils';
+import { NoticeBanner } from './NoticeBanner';
+import { ConfirmDialog, ConfirmRequest } from './ConfirmDialog';
+import { ModalPrimaryButton, ModalShell } from './ModalShell';
 
 const USERS: SystemUser[] = [
   { id: 1, fullName: 'Alexander Cross', email: 'admin@lincolnplatform.io', role: 'superadmin', schoolName: 'Platform Operations', schoolCode: 'PLATFORM', status: 'active', mfaEnabled: true, lastSeen: '2 minutes ago', joinedOn: '2022-07-01' },
@@ -76,24 +81,45 @@ export function SystemUsersView() {
   const [tenantFilter, setTenantFilter] = useState<string>('all');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [users, setUsers] = useState<SystemUser[]>(USERS);
+  const [detail, setDetail] = useState<SystemUser | null>(null);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const { notice, notify, dismiss } = useNotice();
+
+  const revokeSessions = (user: SystemUser) => {
+    setUsers((prev) =>
+      prev.map((item) =>
+        item.id === user.id ? { ...item, lastSeen: 'Session revoked just now' } : item
+      )
+    );
+    notify(`Active sessions revoked for ${user.fullName}. They must sign in again.`, 'warning');
+  };
+
+  const revokeAllSessions = () => {
+    setUsers((prev) => prev.map((item) => ({ ...item, lastSeen: 'Session revoked just now' })));
+    notify(
+      `Every session across all ${users.length} accounts has been revoked. Users must sign in again.`,
+      'warning'
+    );
+  };
 
   const tenants = useMemo(() => {
     const seen = new Map<string, string>();
-    USERS.forEach((user) => seen.set(user.schoolCode, user.schoolName));
+    users.forEach((user) => seen.set(user.schoolCode, user.schoolName));
     return Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, []);
+  }, [users]);
 
   const roleCounts = useMemo(() => {
     const counts: Record<SystemUserRole, number> = { superadmin: 0, admin: 0, teacher: 0, student: 0 };
-    USERS.forEach((user) => {
+    users.forEach((user) => {
       counts[user.role] += 1;
     });
     return counts;
-  }, []);
+  }, [users]);
 
   const rows = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return USERS.filter((user) => {
+    return users.filter((user) => {
       const matchesRole = roleFilter === 'all' || user.role === roleFilter;
       const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
       const matchesTenant = tenantFilter === 'all' || user.schoolCode === tenantFilter;
@@ -105,7 +131,7 @@ export function SystemUsersView() {
         user.schoolCode.toLowerCase().includes(term);
       return matchesRole && matchesStatus && matchesTenant && matchesQuery;
     });
-  }, [query, roleFilter, statusFilter, tenantFilter]);
+  }, [users, query, roleFilter, statusFilter, tenantFilter]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -130,20 +156,54 @@ export function SystemUsersView() {
         <div className="flex items-center gap-2.5">
           <button
             type="button"
-            onClick={() => alert('Directory export will be enabled in the next release.')}
+            onClick={() => {
+              const fileName = downloadCsv(
+                'system_users',
+                ['Full Name', 'Email', 'Role', 'School', 'Tenant Code', 'Status', 'MFA', 'Last Seen', 'Joined'],
+                rows.map((user) => [
+                  user.fullName,
+                  user.email,
+                  ROLE_LABELS[user.role],
+                  user.schoolName,
+                  user.schoolCode,
+                  user.status,
+                  user.mfaEnabled ? 'Enabled' : 'Disabled',
+                  user.lastSeen,
+                  user.joinedOn,
+                ])
+              );
+              notify(`Exported ${rows.length} account${rows.length === 1 ? '' : 's'} to ${fileName}.`);
+            }}
             className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm"
           >
             Export Directory
           </button>
           <button
             type="button"
-            onClick={() => alert('Global session revocation requires a signed confirmation step.')}
+            onClick={() =>
+              setConfirmRequest({
+                eyebrow: 'Platform Security',
+                title: 'Revoke every active session?',
+                confirmLabel: 'Revoke All Sessions',
+                tone: 'danger',
+                typeToConfirm: 'REVOKE',
+                body: (
+                  <>
+                    All {users.length} accounts across every tenant will be signed out immediately, including
+                    your own other devices. Anyone mid-task loses unsaved work and must sign in again.
+                  </>
+                ),
+                onConfirm: revokeAllSessions,
+              })
+            }
             className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10"
           >
             Revoke All Sessions
           </button>
         </div>
       </div>
+
+      <NoticeBanner notice={notice} onDismiss={dismiss} />
 
       {/* Role breakdown */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -267,7 +327,7 @@ export function SystemUsersView() {
                   <td className="py-3 px-3 text-right whitespace-nowrap">
                     <button
                       type="button"
-                      onClick={() => alert(`Opening account record for ${user.fullName}.`)}
+                      onClick={() => setDetail(user)}
                       className="text-[11px] font-semibold text-[#B81D22] hover:underline"
                     >
                       View
@@ -275,7 +335,21 @@ export function SystemUsersView() {
                     <span className="text-zinc-300 mx-1.5">|</span>
                     <button
                       type="button"
-                      onClick={() => alert(`Active sessions revoked for ${user.fullName}.`)}
+                      onClick={() =>
+                        setConfirmRequest({
+                          eyebrow: 'Account Security',
+                          title: 'Revoke this account\u2019s sessions?',
+                          confirmLabel: 'Revoke Sessions',
+                          tone: 'danger',
+                          body: (
+                            <>
+                              <strong>{user.fullName}</strong> is signed out of every device immediately and must
+                              authenticate again. The account itself stays active.
+                            </>
+                          ),
+                          onConfirm: () => revokeSessions(user),
+                        })
+                      }
                       className="text-[11px] font-semibold text-zinc-600 hover:underline"
                     >
                       Revoke
@@ -320,6 +394,61 @@ export function SystemUsersView() {
           </div>
         </div>
       </div>
+      {detail && (
+        <ModalShell
+          eyebrow="Identity Record"
+          title={detail.fullName}
+          subtitle={detail.email}
+          onClose={() => setDetail(null)}
+          footer={<ModalPrimaryButton onClick={() => setDetail(null)}>Close</ModalPrimaryButton>}
+        >
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-block px-2 py-0.5 rounded-md border font-semibold text-[11px] ${
+                  ROLE_STYLES[detail.role]
+                }`}
+              >
+                {ROLE_LABELS[detail.role]}
+              </span>
+              <span
+                className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-extrabold uppercase tracking-wider ${
+                  STATUS_STYLES[detail.status]
+                }`}
+              >
+                {detail.status}
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-zinc-200 divide-y divide-zinc-100 text-xs">
+              {[
+                ['Tenant Boundary', detail.schoolName],
+                ['Tenant Code', detail.schoolCode],
+                ['Multi-Factor Auth', detail.mfaEnabled ? 'Enrolled' : 'Not enrolled'],
+                ['Last Seen', detail.lastSeen],
+                ['Joined On', detail.joinedOn],
+              ].map(([label, value]) => (
+                <div key={label} className="flex items-start justify-between gap-3 px-3 py-2.5">
+                  <span className="text-zinc-500">{label}</span>
+                  <span className="font-semibold text-zinc-900 text-right break-all">{value}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3.5">
+              <p className="font-bold text-amber-900 text-[11px] uppercase tracking-wider">Scoped record</p>
+              <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
+                Academic records for this account stay inside its tenant boundary. Opening them requires a
+                support session on that school.
+              </p>
+            </div>
+          </div>
+        </ModalShell>
+      )}
+
+      {confirmRequest && (
+        <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
+      )}
     </div>
   );
 }

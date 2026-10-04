@@ -80,7 +80,7 @@ export default function SystemReportsPage() {
 
           <button
             type="button"
-            onClick={() => alert('Generating full platform telemetry PDF export...')}
+            onClick={() => window.print()}
             className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 flex items-center gap-1.5"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

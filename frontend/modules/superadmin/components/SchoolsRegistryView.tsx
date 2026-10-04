@@ -1,70 +1,153 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { SchoolTenant, SubscriptionTier, TenantStatus } from '../types';
-
-const TENANTS: SchoolTenant[] = [
-  { id: 1, name: 'Lincoln College of Science Management & Technology', code: 'LC-SMTS-001', domain: 'lincoln.edu', tier: 'enterprise', tierLabel: 'Enterprise University', status: 'active', students: 1240, teachers: 84, storageUsedGb: 139.0, storageQuotaGb: 1000, monthlyFeeNgn: 350000, principalAdmin: 'Dr. Sarah Jenkins', principalEmail: 's.jenkins@lincoln.edu', city: 'Lagos', onboardedOn: '2023-01-14', renewsOn: '2027-01-14', lastActivity: '4 minutes ago' },
-  { id: 2, name: 'St. Augustine Science & Arts Academy', code: 'SA-SMTS-002', domain: 'st-augustine.ac.uk', tier: 'pro', tierLabel: 'Pro Academic', status: 'active', students: 980, teachers: 65, storageUsedGb: 47.1, storageQuotaGb: 250, monthlyFeeNgn: 120000, principalAdmin: 'Dr. Julian Thorne', principalEmail: 'j.thorne@st-augustine.ac.uk', city: 'Abuja', onboardedOn: '2023-04-02', renewsOn: '2026-11-02', lastActivity: '22 minutes ago' },
-  { id: 3, name: 'Horizon STEM Institute', code: 'HZ-SMTS-003', domain: 'horizon-stem.org', tier: 'enterprise', tierLabel: 'Enterprise University', status: 'active', students: 1450, teachers: 96, storageUsedGb: 107.8, storageQuotaGb: 1000, monthlyFeeNgn: 350000, principalAdmin: 'Dr. Fiona Gallagher', principalEmail: 'f.gallagher@horizon-stem.org', city: 'Port Harcourt', onboardedOn: '2023-06-19', renewsOn: '2026-12-19', lastActivity: '1 hour ago' },
-  { id: 4, name: 'Kingsway Polytechnic', code: 'KP-SMTS-004', domain: 'kingswaypoly.ac.uk', tier: 'pro', tierLabel: 'Pro Academic', status: 'active', students: 820, teachers: 54, storageUsedGb: 60.6, storageQuotaGb: 250, monthlyFeeNgn: 120000, principalAdmin: 'Robert Stirling', principalEmail: 'r.stirling@kingswaypoly.ac.uk', city: 'Ibadan', onboardedOn: '2023-08-07', renewsOn: '2027-02-07', lastActivity: '3 hours ago' },
-  { id: 5, name: 'Cambridge International College', code: 'CIC-SMTS-005', domain: 'cambridge-intl.org', tier: 'enterprise', tierLabel: 'Enterprise University', status: 'active', students: 1890, teachers: 120, storageUsedGb: 210.4, storageQuotaGb: 1000, monthlyFeeNgn: 350000, principalAdmin: 'Dr. Victoria Alcott', principalEmail: 'v.alcott@cambridge-intl.org', city: 'Lagos', onboardedOn: '2022-11-23', renewsOn: '2026-11-23', lastActivity: '12 minutes ago' },
-  { id: 6, name: 'Apex Advanced Science Academy', code: 'AASA-SMTS-006', domain: 'apexscience.edu', tier: 'pro', tierLabel: 'Pro Academic', status: 'active', students: 740, teachers: 48, storageUsedGb: 38.5, storageQuotaGb: 250, monthlyFeeNgn: 120000, principalAdmin: 'Prof. David Mercer', principalEmail: 'd.mercer@apexscience.edu', city: 'Enugu', onboardedOn: '2024-01-30', renewsOn: '2027-01-30', lastActivity: '5 hours ago' },
-  { id: 7, name: 'Oakridge Technical High', code: 'OTH-SMTS-007', domain: 'oakridge.sch.uk', tier: 'starter', tierLabel: 'Starter Campus', status: 'active', students: 310, teachers: 22, storageUsedGb: 12.5, storageQuotaGb: 50, monthlyFeeNgn: 45000, principalAdmin: 'Eleanor Vance', principalEmail: 'e.vance@oakridge.sch.uk', city: 'Kano', onboardedOn: '2024-03-11', renewsOn: '2026-10-11', lastActivity: '1 day ago' },
-  { id: 8, name: 'Meridian Grammar School', code: 'MGS-SMTS-008', domain: 'meridiangrammar.edu', tier: 'starter', tierLabel: 'Starter Campus', status: 'active', students: 404, teachers: 29, storageUsedGb: 18.2, storageQuotaGb: 50, monthlyFeeNgn: 45000, principalAdmin: 'Grace Adeyemi', principalEmail: 'g.adeyemi@meridiangrammar.edu', city: 'Benin City', onboardedOn: '2024-05-06', renewsOn: '2026-11-06', lastActivity: '8 hours ago' },
-  { id: 9, name: 'Northgate Institute of Technology', code: 'NIT-SMTS-009', domain: 'northgate-tech.ac.ng', tier: 'pro', tierLabel: 'Pro Academic', status: 'active', students: 1105, teachers: 72, storageUsedGb: 94.3, storageQuotaGb: 250, monthlyFeeNgn: 120000, principalAdmin: 'Dr. Ibrahim Danladi', principalEmail: 'i.danladi@northgate-tech.ac.ng', city: 'Kaduna', onboardedOn: '2023-09-18', renewsOn: '2026-12-18', lastActivity: '35 minutes ago' },
-  { id: 10, name: 'Silverbrook Girls College', code: 'SGC-SMTS-010', domain: 'silverbrook.sch.ng', tier: 'starter', tierLabel: 'Starter Campus', status: 'active', students: 288, teachers: 24, storageUsedGb: 9.7, storageQuotaGb: 50, monthlyFeeNgn: 45000, principalAdmin: 'Mrs. Helen Obi', principalEmail: 'h.obi@silverbrook.sch.ng', city: 'Owerri', onboardedOn: '2024-07-22', renewsOn: '2027-01-22', lastActivity: '2 days ago' },
-  { id: 11, name: 'Royal Crest Academy', code: 'RCA-SMTS-011', domain: 'royalcrest.edu.ng', tier: 'pro', tierLabel: 'Pro Academic', status: 'active', students: 912, teachers: 61, storageUsedGb: 71.9, storageQuotaGb: 250, monthlyFeeNgn: 120000, principalAdmin: 'Dr. Emeka Nwosu', principalEmail: 'e.nwosu@royalcrest.edu.ng', city: 'Abuja', onboardedOn: '2023-11-04', renewsOn: '2026-11-04', lastActivity: '48 minutes ago' },
-  { id: 12, name: 'Brookfield Science Secondary', code: 'BSS-SMTS-012', domain: 'brookfield.sch.ng', tier: 'starter', tierLabel: 'Starter Campus', status: 'active', students: 352, teachers: 27, storageUsedGb: 21.4, storageQuotaGb: 50, monthlyFeeNgn: 45000, principalAdmin: 'Samuel Okafor', principalEmail: 's.okafor@brookfield.sch.ng', city: 'Jos', onboardedOn: '2024-09-09', renewsOn: '2027-03-09', lastActivity: '6 hours ago' },
-  { id: 13, name: 'Whitestone International School', code: 'WIS-SMTS-013', domain: 'whitestone-intl.org', tier: 'enterprise', tierLabel: 'Enterprise University', status: 'active', students: 1620, teachers: 104, storageUsedGb: 168.3, storageQuotaGb: 1000, monthlyFeeNgn: 350000, principalAdmin: 'Dr. Amaka Eze', principalEmail: 'a.eze@whitestone-intl.org', city: 'Lagos', onboardedOn: '2022-08-15', renewsOn: '2026-10-15', lastActivity: '9 minutes ago' },
-  { id: 14, name: 'Hilltop Community College', code: 'HCC-SMTS-014', domain: 'hilltopcc.ac.ng', tier: 'pro', tierLabel: 'Pro Academic', status: 'active', students: 677, teachers: 44, storageUsedGb: 42.8, storageQuotaGb: 250, monthlyFeeNgn: 120000, principalAdmin: 'Blessing Adeyinka', principalEmail: 'b.adeyinka@hilltopcc.ac.ng', city: 'Ilorin', onboardedOn: '2024-02-26', renewsOn: '2027-02-26', lastActivity: '4 hours ago' },
-  { id: 15, name: 'Greenvale Preparatory', code: 'GVP-SMTS-015', domain: 'greenvaleprep.sch.ng', tier: 'starter', tierLabel: 'Starter Campus', status: 'active', students: 196, teachers: 18, storageUsedGb: 6.9, storageQuotaGb: 50, monthlyFeeNgn: 45000, principalAdmin: 'Tunde Bakare', principalEmail: 't.bakare@greenvaleprep.sch.ng', city: 'Abeokuta', onboardedOn: '2025-01-13', renewsOn: '2027-01-13', lastActivity: '3 days ago' },
-  { id: 16, name: 'Pinnacle Medical Sciences College', code: 'PMS-SMTS-016', domain: 'pinnaclemed.ac.ng', tier: 'enterprise', tierLabel: 'Enterprise University', status: 'active', students: 1380, teachers: 118, storageUsedGb: 196.7, storageQuotaGb: 1000, monthlyFeeNgn: 350000, principalAdmin: 'Prof. Chidi Okonkwo', principalEmail: 'c.okonkwo@pinnaclemed.ac.ng', city: 'Enugu', onboardedOn: '2023-03-08', renewsOn: '2027-03-08', lastActivity: '17 minutes ago' },
-  { id: 17, name: 'Eastbourne Technical Institute', code: 'ETI-SMTS-017', domain: 'eastbourne-tech.ac.ng', tier: 'pro', tierLabel: 'Pro Academic', status: 'active', students: 845, teachers: 57, storageUsedGb: 66.2, storageQuotaGb: 250, monthlyFeeNgn: 120000, principalAdmin: 'Dr. Yusuf Bello', principalEmail: 'y.bello@eastbourne-tech.ac.ng', city: 'Maiduguri', onboardedOn: '2023-12-01', renewsOn: '2026-12-01', lastActivity: '1 hour ago' },
-  { id: 18, name: 'Clearwater Agricultural College', code: 'CAC-SMTS-018', domain: 'clearwateragric.ac.ng', tier: 'starter', tierLabel: 'Starter Campus', status: 'active', students: 241, teachers: 21, storageUsedGb: 11.1, storageQuotaGb: 50, monthlyFeeNgn: 45000, principalAdmin: 'Ngozi Udeh', principalEmail: 'n.udeh@clearwateragric.ac.ng', city: 'Makurdi', onboardedOn: '2024-11-17', renewsOn: '2026-11-17', lastActivity: '14 hours ago' },
-  { id: 19, name: 'Crestview Maritime Academy', code: 'CMA-SMTS-019', domain: 'crestview.ac.uk', tier: 'pro', tierLabel: 'Pro Academic', status: 'trialing', students: 120, teachers: 12, storageUsedGb: 5.1, storageQuotaGb: 250, monthlyFeeNgn: 0, principalAdmin: 'Capt. Thomas Hayes', principalEmail: 't.hayes@crestview.ac.uk', city: 'Calabar', onboardedOn: '2026-09-21', renewsOn: '2026-10-21', lastActivity: '26 minutes ago' },
-  { id: 20, name: 'Vanguard Institute of Sciences', code: 'VIS-SMTS-020', domain: 'vanguardsciences.edu', tier: 'pro', tierLabel: 'Pro Academic', status: 'suspended', students: 640, teachers: 42, storageUsedGb: 67.3, storageQuotaGb: 250, monthlyFeeNgn: 120000, principalAdmin: 'Arthur Pendelton', principalEmail: 'a.pendelton@vanguardsciences.edu', city: 'Warri', onboardedOn: '2023-07-05', renewsOn: '2026-07-05', lastActivity: '21 days ago' },
-  { id: 21, name: 'Lakeside Business School', code: 'LBS-SMTS-021', domain: 'lakesidebiz.ac.ng', tier: 'starter', tierLabel: 'Starter Campus', status: 'pending', students: 0, teachers: 0, storageUsedGb: 0, storageQuotaGb: 50, monthlyFeeNgn: 45000, principalAdmin: 'Olusegun Adeniyi', principalEmail: 'o.adeniyi@lakesidebiz.ac.ng', city: 'Uyo', onboardedOn: '2026-10-01', renewsOn: '2027-10-01', lastActivity: 'Awaiting verification' },
-];
-
-const STATUS_STYLES: Record<TenantStatus, string> = {
-  active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  trialing: 'bg-amber-50 text-amber-700 border-amber-200',
-  suspended: 'bg-red-50 text-red-700 border-red-200',
-  pending: 'bg-blue-50 text-blue-700 border-blue-200',
-};
-
-const TIER_STYLES: Record<SubscriptionTier, string> = {
-  starter: 'bg-zinc-100 text-zinc-700 border-zinc-200',
-  pro: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  enterprise: 'bg-purple-50 text-purple-700 border-purple-200',
-};
+import { SCHOOL_TENANTS } from '../services';
+import { useNotice } from '../hooks';
+import {
+  TENANT_STATUS_STYLES,
+  TIER_PRESETS,
+  TIER_STYLES,
+  downloadCsv,
+  storageUsagePercent,
+} from '../utils';
+import { NoticeBanner } from './NoticeBanner';
+import { ConfirmDialog, ConfirmRequest } from './ConfirmDialog';
+import { OnboardDraft, OnboardSchoolModal } from './OnboardSchoolModal';
+import { BillingHistoryModal, ChangeTierModal } from './TenantDialogs';
 
 type SortKey = 'name' | 'students' | 'storageUsedGb' | 'monthlyFeeNgn';
 
 export function SchoolsRegistryView() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [statusFilter, setStatusFilter] = useState<'all' | TenantStatus>('all');
   const [tierFilter, setTierFilter] = useState<'all' | SubscriptionTier>('all');
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('students');
   const [sortDesc, setSortDesc] = useState(true);
-  const [selected, setSelected] = useState<SchoolTenant | null>(null);
+
+  const [tenants, setTenants] = useState<SchoolTenant[]>(SCHOOL_TENANTS);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [onboardOpen, setOnboardOpen] = useState(() => searchParams.get('onboard') === '1');
+  const [tierTarget, setTierTarget] = useState<SchoolTenant | null>(null);
+  const [billingTarget, setBillingTarget] = useState<SchoolTenant | null>(null);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const { notice, notify, dismiss } = useNotice();
+
+  // Deep links from the dashboard (?tenant=CODE) open that tenant's inspector.
+  const deepLinkCode = searchParams.get('tenant');
+  const selected =
+    tenants.find((tenant) => tenant.id === selectedId) ??
+    (deepLinkCode ? tenants.find((tenant) => tenant.code === deepLinkCode) ?? null : null);
+
+  const closeInspector = () => {
+    setSelectedId(null);
+    if (deepLinkCode) router.replace('/schools');
+  };
+
+  const clearOnboardParam = () => {
+    setOnboardOpen(false);
+    if (searchParams.get('onboard')) router.replace('/schools');
+  };
+
+  const handleProvision = (draft: OnboardDraft) => {
+    const preset = TIER_PRESETS[draft.tier];
+
+    const tenant: SchoolTenant = {
+      id: Math.max(0, ...tenants.map((item) => item.id)) + 1,
+      name: draft.name,
+      code: draft.code,
+      domain: draft.domain,
+      tier: draft.tier,
+      tierLabel: preset.label,
+      status: draft.startAsTrial ? 'trialing' : 'pending',
+      students: 0,
+      teachers: 0,
+      storageUsedGb: 0,
+      storageQuotaGb: preset.storageQuotaGb,
+      monthlyFeeNgn: draft.startAsTrial ? 0 : preset.monthlyFeeNgn,
+      principalAdmin: draft.principalAdmin,
+      principalEmail: draft.principalEmail,
+      city: draft.city,
+      onboardedOn: '2026-10-04',
+      renewsOn: draft.startAsTrial ? '2026-11-03' : '2027-10-04',
+      lastActivity: 'Awaiting first sign-in',
+    };
+
+    setTenants((prev) => [tenant, ...prev]);
+    setStatusFilter('all');
+    setTierFilter('all');
+    setQuery('');
+    clearOnboardParam();
+    setSelectedId(tenant.id);
+    notify(
+      `${tenant.name} provisioned as ${tenant.code}. ${
+        draft.startAsTrial ? 'Trial runs to 2026-11-03.' : `Billing starts at ₦${preset.monthlyFeeNgn.toLocaleString()}/month.`
+      }`
+    );
+  };
+
+  const handleTierChange = (tenant: SchoolTenant, tier: SubscriptionTier) => {
+    const preset = TIER_PRESETS[tier];
+    setTenants((prev) =>
+      prev.map((item) =>
+        item.id === tenant.id
+          ? {
+              ...item,
+              tier,
+              tierLabel: preset.label,
+              storageQuotaGb: preset.storageQuotaGb,
+              monthlyFeeNgn: item.status === 'trialing' ? 0 : preset.monthlyFeeNgn,
+            }
+          : item
+      )
+    );
+    notify(`${tenant.name} moved to ${preset.label}. New quota: ${preset.storageQuotaGb} GB.`);
+  };
+
+  const handleToggleSuspension = (tenant: SchoolTenant) => {
+    const reinstating = tenant.status === 'suspended';
+    setTenants((prev) =>
+      prev.map((item) =>
+        item.id === tenant.id ? { ...item, status: reinstating ? 'active' : 'suspended' } : item
+      )
+    );
+    notify(
+      reinstating
+        ? `${tenant.name} reinstated. Campus portals are reachable again.`
+        : `${tenant.name} suspended. All campus sign-ins are now blocked.`,
+      reinstating ? 'success' : 'warning'
+    );
+  };
+
+  const handleGrantAccess = (tenant: SchoolTenant) => {
+    setTenants((prev) =>
+      prev.map((item) => (item.id === tenant.id ? { ...item, lastActivity: 'SuperAdmin session active' } : item))
+    );
+    notify(
+      `Support session opened on ${tenant.name}. It expires in 30 minutes and every action is written to the audit trail.`,
+      'info'
+    );
+  };
 
   const totals = useMemo(
     () => ({
-      count: TENANTS.length,
-      active: TENANTS.filter((t) => t.status === 'active').length,
-      students: TENANTS.reduce((sum, t) => sum + t.students, 0),
-      teachers: TENANTS.reduce((sum, t) => sum + t.teachers, 0),
-      storage: TENANTS.reduce((sum, t) => sum + t.storageUsedGb, 0),
-      mrr: TENANTS.filter((t) => t.status === 'active').reduce((sum, t) => sum + t.monthlyFeeNgn, 0),
+      count: tenants.length,
+      active: tenants.filter((t) => t.status === 'active').length,
+      students: tenants.reduce((sum, t) => sum + t.students, 0),
+      teachers: tenants.reduce((sum, t) => sum + t.teachers, 0),
+      storage: tenants.reduce((sum, t) => sum + t.storageUsedGb, 0),
+      mrr: tenants.filter((t) => t.status === 'active').reduce((sum, t) => sum + t.monthlyFeeNgn, 0),
     }),
-    []
+    [tenants]
   );
 
   const rows = useMemo(() => {
     const term = query.trim().toLowerCase();
-    const filtered = TENANTS.filter((tenant) => {
+    const filtered = tenants.filter((tenant) => {
       const matchesStatus = statusFilter === 'all' || tenant.status === statusFilter;
       const matchesTier = tierFilter === 'all' || tenant.tier === tierFilter;
       const matchesQuery =
@@ -82,7 +165,7 @@ export function SchoolsRegistryView() {
       if (sortKey === 'name') return a.name.localeCompare(b.name) * direction;
       return (a[sortKey] - b[sortKey]) * direction;
     });
-  }, [query, statusFilter, tierFilter, sortKey, sortDesc]);
+  }, [tenants, query, statusFilter, tierFilter, sortKey, sortDesc]);
 
   const toggleSort = (key: SortKey) => {
     if (key === sortKey) {
@@ -109,14 +192,30 @@ export function SchoolsRegistryView() {
         <div className="flex items-center gap-2.5">
           <button
             type="button"
-            onClick={() => alert('Tenant registry CSV export will be enabled in the next release.')}
+            onClick={() => {
+              const fileName = downloadCsv(
+                'tenant_registry',
+                [
+                  'School Name', 'Tenant Code', 'Domain', 'Tier', 'Status', 'Students', 'Faculty',
+                  'Storage Used (GB)', 'Storage Quota (GB)', 'Monthly Fee (NGN)',
+                  'Principal Admin', 'Admin Email', 'City', 'Onboarded', 'Renews',
+                ],
+                rows.map((tenant) => [
+                  tenant.name, tenant.code, tenant.domain, tenant.tierLabel, tenant.status,
+                  tenant.students, tenant.teachers, tenant.storageUsedGb.toFixed(1), tenant.storageQuotaGb,
+                  tenant.monthlyFeeNgn, tenant.principalAdmin, tenant.principalEmail, tenant.city,
+                  tenant.onboardedOn, tenant.renewsOn,
+                ])
+              );
+              notify(`Exported ${rows.length} tenant${rows.length === 1 ? '' : 's'} to ${fileName}.`);
+            }}
             className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm"
           >
             Export Registry
           </button>
           <button
             type="button"
-            onClick={() => alert('School Provisioning Modal will be enabled in next release.')}
+            onClick={() => setOnboardOpen(true)}
             className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 flex items-center gap-1.5"
           >
             <span className="text-base leading-none">+</span>
@@ -124,6 +223,8 @@ export function SchoolsRegistryView() {
           </button>
         </div>
       </div>
+
+      <NoticeBanner notice={notice} onDismiss={dismiss} />
 
       {/* Aggregate strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -177,7 +278,7 @@ export function SchoolsRegistryView() {
           </div>
 
           <span className="text-[11px] text-zinc-500 shrink-0">
-            Showing <span className="font-bold text-zinc-800">{rows.length}</span> of {TENANTS.length} tenants
+            Showing <span className="font-bold text-zinc-800">{rows.length}</span> of {tenants.length} tenants
           </span>
         </div>
 
@@ -221,7 +322,7 @@ export function SchoolsRegistryView() {
             </thead>
             <tbody className="divide-y divide-zinc-100 text-zinc-700">
               {rows.map((tenant) => {
-                const usage = Math.min(100, (tenant.storageUsedGb / tenant.storageQuotaGb) * 100);
+                const usage = storageUsagePercent(tenant);
                 return (
                   <tr key={tenant.id} className="hover:bg-zinc-50/60 transition-colors">
                     <td className="py-3 px-3">
@@ -260,7 +361,7 @@ export function SchoolsRegistryView() {
                     </td>
                     <td className="py-3 px-3 text-center">
                       <span
-                        className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-extrabold uppercase tracking-wider ${STATUS_STYLES[tenant.status]}`}
+                        className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-extrabold uppercase tracking-wider ${TENANT_STATUS_STYLES[tenant.status]}`}
                       >
                         {tenant.status}
                       </span>
@@ -268,7 +369,7 @@ export function SchoolsRegistryView() {
                     <td className="py-3 px-3 text-right">
                       <button
                         type="button"
-                        onClick={() => setSelected(tenant)}
+                        onClick={() => setSelectedId(tenant.id)}
                         className="text-[11px] font-semibold text-[#B81D22] hover:underline"
                       >
                         Inspect
@@ -295,7 +396,7 @@ export function SchoolsRegistryView() {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setSelected(null)}
+            onClick={() => closeInspector()}
             aria-hidden="true"
           />
 
@@ -310,7 +411,7 @@ export function SchoolsRegistryView() {
               </div>
               <button
                 type="button"
-                onClick={() => setSelected(null)}
+                onClick={() => closeInspector()}
                 className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-800 hover:bg-zinc-200/60 transition-colors"
                 aria-label="Close inspector"
               >
@@ -322,7 +423,7 @@ export function SchoolsRegistryView() {
 
             <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
               <div className="flex items-center gap-2">
-                <span className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-extrabold uppercase tracking-wider ${STATUS_STYLES[selected.status]}`}>
+                <span className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-extrabold uppercase tracking-wider ${TENANT_STATUS_STYLES[selected.status]}`}>
                   {selected.status}
                 </span>
                 <span className={`inline-block px-2 py-0.5 rounded-md border font-semibold text-[11px] ${TIER_STYLES[selected.tier]}`}>
@@ -362,21 +463,35 @@ export function SchoolsRegistryView() {
             <div className="p-5 border-t border-zinc-200 bg-zinc-50 grid grid-cols-2 gap-2.5">
               <button
                 type="button"
-                onClick={() => alert(`Opening ${selected.name} subscription editor.`)}
+                onClick={() => setTierTarget(selected)}
                 className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-white/60 transition-colors shadow-sm"
               >
                 Change Tier
               </button>
               <button
                 type="button"
-                onClick={() => alert(`Impersonation session request logged for ${selected.name}.`)}
+                onClick={() =>
+                  setConfirmRequest({
+                    eyebrow: 'Tenant Access',
+                    title: 'Open a support session?',
+                    confirmLabel: 'Open Session',
+                    body: (
+                      <>
+                        You will be signed in to <strong>{selected.name}</strong> as a SuperAdmin observer for 30
+                        minutes. The tenant&apos;s administrators are notified, and every action you take is
+                        recorded in the platform audit trail.
+                      </>
+                    ),
+                    onConfirm: () => handleGrantAccess(selected),
+                  })
+                }
                 className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-white/60 transition-colors shadow-sm"
               >
                 Request Access
               </button>
               <button
                 type="button"
-                onClick={() => alert(`Billing history for ${selected.name}.`)}
+                onClick={() => setBillingTarget(selected)}
                 className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-white/60 transition-colors shadow-sm"
               >
                 Billing History
@@ -384,11 +499,27 @@ export function SchoolsRegistryView() {
               <button
                 type="button"
                 onClick={() =>
-                  alert(
-                    selected.status === 'suspended'
-                      ? `Reinstatement request queued for ${selected.name}.`
-                      : `Suspension request queued for ${selected.name}.`
-                  )
+                  setConfirmRequest({
+                    eyebrow: 'Tenant Status',
+                    title: selected.status === 'suspended' ? 'Reinstate this tenant?' : 'Suspend this tenant?',
+                    confirmLabel: selected.status === 'suspended' ? 'Reinstate Tenant' : 'Suspend Tenant',
+                    tone: selected.status === 'suspended' ? 'default' : 'danger',
+                    typeToConfirm: selected.status === 'suspended' ? undefined : 'SUSPEND',
+                    body:
+                      selected.status === 'suspended' ? (
+                        <>
+                          <strong>{selected.name}</strong> regains access immediately. Billing resumes at ₦
+                          {selected.monthlyFeeNgn.toLocaleString()} per month from the next cycle.
+                        </>
+                      ) : (
+                        <>
+                          Every sign-in for <strong>{selected.name}</strong> stops at once, affecting{' '}
+                          {selected.students.toLocaleString()} students and {selected.teachers} staff. Data is
+                          retained and the tenant can be reinstated later.
+                        </>
+                      ),
+                    onConfirm: () => handleToggleSuspension(selected),
+                  })
                 }
                 className="px-3.5 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10"
               >
@@ -397,6 +528,35 @@ export function SchoolsRegistryView() {
             </div>
           </aside>
         </div>
+      )}
+      {onboardOpen && (
+        <OnboardSchoolModal
+          onClose={clearOnboardParam}
+          onProvision={handleProvision}
+          existingCodes={tenants.map((tenant) => tenant.code)}
+          existingDomains={tenants.map((tenant) => tenant.domain)}
+          nextSequence={tenants.length + 1}
+        />
+      )}
+
+      {tierTarget && (
+        <ChangeTierModal
+          tenant={tierTarget}
+          onClose={() => setTierTarget(null)}
+          onApply={(tier) => handleTierChange(tierTarget, tier)}
+        />
+      )}
+
+      {billingTarget && (
+        <BillingHistoryModal
+          tenant={billingTarget}
+          onClose={() => setBillingTarget(null)}
+          onExported={(fileName) => notify(`Billing history exported to ${fileName}.`)}
+        />
+      )}
+
+      {confirmRequest && (
+        <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
       )}
     </div>
   );

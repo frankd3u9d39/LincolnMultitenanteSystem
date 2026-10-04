@@ -11,6 +11,11 @@ import {
   adminInitials,
 } from '../utils';
 import { InviteAdministratorModal, InviteDraft } from './InviteAdministratorModal';
+import { ConfirmDialog, ConfirmRequest } from './ConfirmDialog';
+import { PermissionsModal } from './PermissionsModal';
+import { NoticeBanner } from './NoticeBanner';
+import { useNotice } from '../hooks';
+import { downloadCsv } from '../utils';
 
 export function AdministratorsView() {
   const [statusFilter, setStatusFilter] = useState<'all' | AdminAccountStatus>('all');
@@ -20,7 +25,39 @@ export function AdministratorsView() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [admins, setAdmins] = useState<SchoolAdministrator[]>(ADMINISTRATORS);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const [permissionsTarget, setPermissionsTarget] = useState<SchoolAdministrator | null>(null);
+  const { notice, notify, dismiss } = useNotice();
+
+  const enforceMfa = () => {
+    setAdmins((prev) =>
+      prev.map((admin) => (selectedIds.includes(admin.id) ? { ...admin, mfaEnabled: true } : admin))
+    );
+    const count = selectedIds.length;
+    setSelectedIds([]);
+    notify(`MFA enrolment enforced on ${count} account${count === 1 ? '' : 's'}. They must register an authenticator at next sign-in.`);
+  };
+
+  const sendResetLinks = () => {
+    const count = selectedIds.length;
+    setSelectedIds([]);
+    notify(`Password reset links sent to ${count} administrator${count === 1 ? '' : 's'}. Each link expires in 60 minutes.`, 'info');
+  };
+
+  const toggleAccountStatus = (admin: SchoolAdministrator) => {
+    const unlocking = admin.status === 'locked';
+    setAdmins((prev) =>
+      prev.map((item) =>
+        item.id === admin.id ? { ...item, status: unlocking ? 'active' : 'disabled' } : item
+      )
+    );
+    notify(
+      unlocking
+        ? `${admin.fullName} unlocked and able to sign in again.`
+        : `${admin.fullName} suspended. Their administrator access is revoked.`,
+      unlocking ? 'success' : 'warning'
+    );
+  };
 
   const handleInvite = (draft: InviteDraft) => {
     const tenant = admins.find((admin) => admin.schoolCode === draft.schoolCode);
@@ -46,12 +83,11 @@ export function AdministratorsView() {
     setInviteOpen(false);
     setStatusFilter('all');
     setRoleFilter(draft.role);
-    setInviteNotice(
+    notify(
       `Invitation sent to ${draft.email}. The account stays in an invited state until first sign-in${
         draft.requireMfa ? ', and MFA enrolment is required at that point' : ''
       }.`
     );
-    setTimeout(() => setInviteNotice(null), 6000);
   };
 
   const stats = useMemo(
@@ -104,6 +140,32 @@ export function AdministratorsView() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              const fileName = downloadCsv(
+                'school_administrators',
+                ['Full Name', 'Email', 'Phone', 'School', 'Tenant Code', 'Role', 'Status', 'MFA', 'Last Login', 'Last IP', 'Created'],
+                rows.map((admin) => [
+                  admin.fullName,
+                  admin.email,
+                  admin.phone,
+                  admin.schoolName,
+                  admin.schoolCode,
+                  ADMIN_ROLE_LABELS[admin.role],
+                  admin.status,
+                  admin.mfaEnabled ? 'Enabled' : 'Disabled',
+                  admin.lastLogin,
+                  admin.lastLoginIp,
+                  admin.createdOn,
+                ])
+              );
+              notify(`Exported ${rows.length} administrator${rows.length === 1 ? '' : 's'} to ${fileName}.`);
+            }}
+            className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm"
+          >
+            Export CSV
+          </button>
           <Link
             href="/administrators/access-report"
             className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm"
@@ -121,14 +183,7 @@ export function AdministratorsView() {
         </div>
       </div>
 
-      {inviteNotice && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 flex items-start gap-2">
-          <svg className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-          <span className="text-xs font-semibold text-emerald-900">{inviteNotice}</span>
-        </div>
-      )}
+      <NoticeBanner notice={notice} onDismiss={dismiss} />
 
       {/* Stat strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -211,14 +266,42 @@ export function AdministratorsView() {
             <div className="flex flex-wrap items-center gap-2 min-w-0">
               <button
                 type="button"
-                onClick={() => alert(`MFA enrolment enforced for ${selectedIds.length} account(s).`)}
+                onClick={() =>
+                  setConfirmRequest({
+                    eyebrow: 'Bulk Action',
+                    title: 'Enforce MFA enrolment?',
+                    confirmLabel: 'Enforce MFA',
+                    body: (
+                      <>
+                        {selectedIds.length} selected account
+                        {selectedIds.length === 1 ? '' : 's'} will be required to register an authenticator
+                        before reaching the dashboard again.
+                      </>
+                    ),
+                    onConfirm: enforceMfa,
+                  })
+                }
                 className="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors"
               >
                 Enforce MFA
               </button>
               <button
                 type="button"
-                onClick={() => alert(`Password reset links queued for ${selectedIds.length} account(s).`)}
+                onClick={() =>
+                  setConfirmRequest({
+                    eyebrow: 'Bulk Action',
+                    title: 'Send password reset links?',
+                    confirmLabel: 'Send Links',
+                    body: (
+                      <>
+                        A single-use reset link is emailed to {selectedIds.length} administrator
+                        {selectedIds.length === 1 ? '' : 's'}. Existing passwords keep working until a link is
+                        used.
+                      </>
+                    ),
+                    onConfirm: sendResetLinks,
+                  })
+                }
                 className="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors"
               >
                 Send Reset Link
@@ -311,7 +394,7 @@ export function AdministratorsView() {
                   <td className="py-3 px-3 text-right whitespace-nowrap">
                     <button
                       type="button"
-                      onClick={() => alert(`Opening permission matrix for ${admin.fullName}.`)}
+                      onClick={() => setPermissionsTarget(admin)}
                       className="text-[11px] font-semibold text-[#B81D22] hover:underline"
                     >
                       Permissions
@@ -320,11 +403,25 @@ export function AdministratorsView() {
                     <button
                       type="button"
                       onClick={() =>
-                        alert(
-                          admin.status === 'locked'
-                            ? `Unlock request queued for ${admin.fullName}.`
-                            : `Suspension request queued for ${admin.fullName}.`
-                        )
+                        setConfirmRequest({
+                          eyebrow: 'Account Status',
+                          title: admin.status === 'locked' ? 'Unlock this account?' : 'Suspend this account?',
+                          confirmLabel: admin.status === 'locked' ? 'Unlock Account' : 'Suspend Account',
+                          tone: admin.status === 'locked' ? 'default' : 'danger',
+                          body:
+                            admin.status === 'locked' ? (
+                              <>
+                                <strong>{admin.fullName}</strong> can sign in again immediately. The failed-attempt
+                                counter is reset.
+                              </>
+                            ) : (
+                              <>
+                                <strong>{admin.fullName}</strong> loses administrator access to{' '}
+                                {admin.schoolName} at once. The account is retained and can be restored later.
+                              </>
+                            ),
+                          onConfirm: () => toggleAccountStatus(admin),
+                        })
                       }
                       className="text-[11px] font-semibold text-zinc-600 hover:underline"
                     >
@@ -352,6 +449,18 @@ export function AdministratorsView() {
           onInvite={handleInvite}
           existingEmails={admins.map((admin) => admin.email.toLowerCase())}
         />
+      )}
+
+      {permissionsTarget && (
+        <PermissionsModal
+          admin={permissionsTarget}
+          onClose={() => setPermissionsTarget(null)}
+          onSave={(summary) => notify(summary)}
+        />
+      )}
+
+      {confirmRequest && (
+        <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
       )}
     </div>
   );

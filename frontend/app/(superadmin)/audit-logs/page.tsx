@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { downloadCsv } from '@/modules/superadmin/utils';
 
 interface AuditLog {
   id: number;
@@ -165,7 +166,35 @@ export default function SecurityAuditLogsPage() {
           </div>
           <button
             type="button"
-            onClick={() => alert('Exporting signed security audit CSV...')}
+            onClick={() => {
+              downloadCsv(
+                'security_audit_log',
+                [
+                  'Timestamp',
+                  'Event Type',
+                  'Severity',
+                  'Actor',
+                  'Actor Email',
+                  'Actor Role',
+                  'School',
+                  'IP Address',
+                  'Description',
+                  'User Agent',
+                ],
+                filteredLogs.map((log) => [
+                  log.timestamp,
+                  log.eventType,
+                  log.severity,
+                  log.actorName,
+                  log.actorEmail,
+                  log.actorRole,
+                  log.schoolName,
+                  log.ipAddress,
+                  log.description,
+                  log.userAgent,
+                ])
+              );
+            }}
             className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 flex items-center gap-1.5"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

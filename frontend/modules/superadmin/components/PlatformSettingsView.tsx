@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FullPlatformSettings, SubscriptionTier } from '../types';
+import { FullPlatformSettings, SubscriptionTier, TierLimitConfig } from '../types';
+import { ModalPrimaryButton, ModalSecondaryButton, ModalShell } from './ModalShell';
 
 type SettingsTab = 'general' | 'tenants' | 'security' | 'mail' | 'storage';
 
@@ -117,6 +118,14 @@ export function PlatformSettingsView() {
   const [testEmailResult, setTestEmailResult] = useState<string | null>(null);
   const [backupTriggering, setBackupTriggering] = useState(false);
   const [backupSuccessMsg, setBackupSuccessMsg] = useState<string | null>(null);
+  const [tierEditTarget, setTierEditTarget] = useState<SubscriptionTier | null>(null);
+
+  const handleTierLimitsChange = (tier: SubscriptionTier, limits: TierLimitConfig) => {
+    setSettings((prev) => ({
+      ...prev,
+      tierLimits: { ...prev.tierLimits, [tier]: limits },
+    }));
+  };
 
   const handleGeneralChange = <K extends keyof FullPlatformSettings['general']>(
     key: K,
@@ -592,7 +601,7 @@ export function PlatformSettingsView() {
                     <div className="mt-5 pt-3 border-t border-zinc-100">
                       <button
                         type="button"
-                        onClick={() => alert(`Adjusting ${tier.name} quota values modal.`)}
+                        onClick={() => setTierEditTarget(tierKey)}
                         className="w-full py-1.5 rounded-lg border border-zinc-200 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors"
                       >
                         Edit Tier Quotas
@@ -1019,6 +1028,120 @@ export function PlatformSettingsView() {
           </div>
         </div>
       )}
+      {tierEditTarget && (
+        <TierQuotaModal
+          tier={settings.tierLimits[tierEditTarget]}
+          onClose={() => setTierEditTarget(null)}
+          onSave={(limits) => handleTierLimitsChange(tierEditTarget, limits)}
+        />
+      )}
     </div>
+  );
+}
+
+interface TierQuotaModalProps {
+  tier: TierLimitConfig;
+  onClose: () => void;
+  onSave: (limits: TierLimitConfig) => void;
+}
+
+/** Edits the quota ceiling and price applied to every tenant on one subscription tier. */
+function TierQuotaModal({ tier, onClose, onSave }: TierQuotaModalProps) {
+  const [draft, setDraft] = useState<TierLimitConfig>(tier);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const updateNumber = (key: keyof TierLimitConfig, raw: string) => {
+    const value = Number(raw.replace(/[^0-9]/g, ''));
+    setDraft((prev) => ({ ...prev, [key]: Number.isNaN(value) ? 0 : value }));
+    setErrors((prev) => ({ ...prev, [key]: '' }));
+  };
+
+  const handleSave = () => {
+    const found: Record<string, string> = {};
+    if (draft.maxStudents < 1) found.maxStudents = 'Must allow at least one student.';
+    if (draft.maxTeachers < 1) found.maxTeachers = 'Must allow at least one staff member.';
+    if (draft.storageQuotaGb < 1) found.storageQuotaGb = 'Allocate at least 1 GB.';
+    if (draft.monthlyPriceNgn < 0) found.monthlyPriceNgn = 'Price cannot be negative.';
+
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
+    onSave(draft);
+    onClose();
+  };
+
+  const fields: Array<{ key: keyof TierLimitConfig; label: string; hint: string; prefix?: string }> = [
+    { key: 'maxStudents', label: 'Maximum Students', hint: 'Enrolment ceiling per tenant on this tier.' },
+    { key: 'maxTeachers', label: 'Maximum Faculty & Staff', hint: 'Combined teaching and admin accounts.' },
+    { key: 'storageQuotaGb', label: 'Storage Quota (GB)', hint: 'Applied to the tenant object store.' },
+    { key: 'monthlyPriceNgn', label: 'Monthly Price', hint: 'Charged at the start of each billing cycle.', prefix: '₦' },
+  ];
+
+  const changed = fields.some((field) => draft[field.key] !== tier[field.key]);
+
+  return (
+    <ModalShell
+      eyebrow="Subscription Tiers"
+      title={`Edit ${tier.name} Quotas`}
+      subtitle="Applies to every tenant provisioned on this tier, at their next billing cycle."
+      onClose={onClose}
+      footer={
+        <>
+          <ModalSecondaryButton onClick={onClose}>Cancel</ModalSecondaryButton>
+          <ModalPrimaryButton onClick={handleSave} disabled={!changed}>
+            Save Quotas
+          </ModalPrimaryButton>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {fields.map((field) => (
+            <div key={field.key}>
+              <label
+                className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5"
+                htmlFor={`tier-${field.key}`}
+              >
+                {field.label}
+              </label>
+              <div className="relative">
+                {field.prefix && (
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
+                    {field.prefix}
+                  </span>
+                )}
+                <input
+                  id={`tier-${field.key}`}
+                  type="text"
+                  inputMode="numeric"
+                  value={Number(draft[field.key]).toLocaleString()}
+                  onChange={(e) => updateNumber(field.key, e.target.value)}
+                  className={`w-full ${field.prefix ? 'pl-7' : 'pl-3'} pr-3 py-2 text-xs rounded-xl border bg-white text-zinc-800 focus:outline-none focus:ring-2 transition-all ${
+                    errors[field.key]
+                      ? 'border-red-400 focus:ring-red-500/20 focus:border-red-500'
+                      : 'border-zinc-200 focus:ring-[#B81D22]/20 focus:border-[#B81D22]'
+                  }`}
+                />
+              </div>
+              {errors[field.key] ? (
+                <p className="mt-1 text-[11px] font-semibold text-red-600">{errors[field.key]}</p>
+              ) : (
+                <p className="mt-1 text-[11px] text-zinc-400">{field.hint}</p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {changed && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 text-[11px] text-blue-900 leading-relaxed">
+            <p className="font-bold uppercase tracking-wider">Pending change</p>
+            <p className="mt-1">
+              Existing tenants above the new ceiling keep their data but cannot add records until they upgrade
+              or reduce usage.
+            </p>
+          </div>
+        )}
+      </div>
+    </ModalShell>
   );
 }
