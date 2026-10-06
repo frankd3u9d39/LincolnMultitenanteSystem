@@ -1,0 +1,181 @@
+<?php
+
+namespace App\Services\SuperAdmin;
+
+use App\Models\AuditLog;
+use App\Models\School;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+
+/**
+ * GROUP 4: SuperAdmin Module - tenant lifecycle.
+ *
+ * Creating a school and inviting its first administrator happen together in one
+ * transaction: a tenant with no way in is not a usable tenant.
+ */
+class TenantProvisioningService
+{
+    public function __construct(private readonly AuditLogger $audit) {}
+
+    /**
+     * Provisions a new tenant boundary and its principal administrator.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{school: School, administrator: User, temporary_password: string}
+     */
+    public function provision(array $data): array
+    {
+        return DB::transaction(function () use ($data) {
+            $activateImmediately = (bool) ($data['activate_immediately'] ?? false);
+
+            $school = School::create([
+                'name' => $data['name'],
+                'code' => strtoupper($data['code']),
+                'slug' => $this->uniqueSlug($data['name']),
+                'domain' => $data['domain'],
+                'contact_email' => $data['principal_email'],
+                'contact_phone' => $data['principal_phone'] ?? null,
+                'city' => $data['city'],
+                'country' => $data['country'] ?? 'Nigeria',
+                'status' => $activateImmediately ? School::STATUS_ACTIVE : School::STATUS_PENDING,
+                'storage_limit_gb' => $data['storage_quota_gb'],
+                'max_students' => $data['max_students'] ?? 10000,
+                'max_teachers' => $data['max_teachers'] ?? 800,
+                'max_file_upload_mb' => $data['max_file_upload_mb'] ?? 50,
+                'storage_used_mb' => 0,
+                'onboarded_at' => now(),
+            ]);
+
+            // The administrator never receives this password directly; it exists
+            // so the account is never left with an empty credential.
+            $temporaryPassword = Str::password(16);
+
+            $administrator = User::create([
+                'school_id' => $school->id,
+                'name' => $data['principal_admin'],
+                'email' => strtolower($data['principal_email']),
+                'password' => Hash::make($temporaryPassword),
+                'role' => User::ROLE_ADMIN,
+                'phone' => $data['principal_phone'] ?? null,
+                'status' => User::STATUS_PENDING,
+                'mfa_enabled' => false,
+                'invited_at' => now(),
+            ]);
+
+            $this->audit->recordTenantChange(
+                eventType: 'tenant.provisioned',
+                action: 'Provisioned School Tenant',
+                description: sprintf(
+                    'Provisioned %s (%s) with a %d GB storage quota.',
+                    $school->name,
+                    $school->code,
+                    $school->storage_limit_gb
+                ),
+                school: $school,
+                newValues: [
+                    'code' => $school->code,
+                    'domain' => $school->domain,
+                    'status' => $school->status,
+                    'storage_limit_gb' => $school->storage_limit_gb,
+                ],
+            );
+
+            return [
+                'school' => $school,
+                'administrator' => $administrator,
+                'temporary_password' => $temporaryPassword,
+            ];
+        });
+    }
+
+    /** Suspends a tenant, blocking every sign-in inside that boundary. */
+    public function suspend(School $school, ?string $reason = null): School
+    {
+        $previous = $school->status;
+        $school->update(['status' => School::STATUS_SUSPENDED]);
+
+        $this->audit->recordTenantChange(
+            eventType: 'tenant.suspended',
+            action: 'Suspended School Tenant',
+            description: sprintf(
+                'Suspended %s (%s).%s',
+                $school->name,
+                $school->code,
+                $reason ? ' Reason: '.$reason : ''
+            ),
+            school: $school,
+            oldValues: ['status' => $previous],
+            newValues: ['status' => $school->status, 'reason' => $reason],
+            severity: AuditLog::SEVERITY_WARNING,
+        );
+
+        return $school->fresh();
+    }
+
+    /** Returns a suspended tenant to active service. */
+    public function reinstate(School $school): School
+    {
+        $previous = $school->status;
+        $school->update(['status' => School::STATUS_ACTIVE]);
+
+        $this->audit->recordTenantChange(
+            eventType: 'tenant.reinstated',
+            action: 'Reinstated School Tenant',
+            description: sprintf('Reinstated %s (%s). Campus portals are reachable again.', $school->name, $school->code),
+            school: $school,
+            oldValues: ['status' => $previous],
+            newValues: ['status' => $school->status],
+        );
+
+        return $school->fresh();
+    }
+
+    /** Changes a tenant's storage ceiling, refusing to drop below current usage. */
+    public function changeStorageQuota(School $school, int $storageQuotaGb): School
+    {
+        $usedGb = $school->storage_used_mb / 1024;
+
+        if ($storageQuotaGb < $usedGb) {
+            throw new \InvalidArgumentException(sprintf(
+                'Quota of %d GB is below the %.1f GB already stored by this school.',
+                $storageQuotaGb,
+                $usedGb
+            ));
+        }
+
+        $previous = $school->storage_limit_gb;
+        $school->update(['storage_limit_gb' => $storageQuotaGb]);
+
+        $this->audit->recordTenantChange(
+            eventType: 'tenant.quota_changed',
+            action: 'Changed Tenant Storage Quota',
+            description: sprintf(
+                'Storage quota for %s changed from %d GB to %d GB.',
+                $school->name,
+                $previous,
+                $storageQuotaGb
+            ),
+            school: $school,
+            oldValues: ['storage_limit_gb' => $previous],
+            newValues: ['storage_limit_gb' => $storageQuotaGb],
+        );
+
+        return $school->fresh();
+    }
+
+    /** Builds a slug that is unique across tenants, even for similar names. */
+    private function uniqueSlug(string $name): string
+    {
+        $base = Str::slug(Str::limit($name, 60, ''));
+        $slug = $base;
+        $suffix = 1;
+
+        while (School::withTrashed()->where('slug', $slug)->exists()) {
+            $slug = $base.'-'.(++$suffix);
+        }
+
+        return $slug;
+    }
+}
