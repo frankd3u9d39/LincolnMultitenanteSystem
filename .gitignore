@@ -1,0 +1,49 @@
+# LincolnMultitenanteSystem Root .gitignore
+
+# Dependencies
+frontend/node_modules/
+backend/vendor/
+
+# Next.js Build Outputs
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Environment Files
+frontend/.env*.local
+backend/.env
+backend/.env.backup
+backend/.env.production
+
+# Laravel Storage & Logs
+backend/storage/*.key
+backend/storage/logs/*.log
+backend/storage/framework/cache/data/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/storage/framework/testing/*
+!backend/storage/framework/cache/.gitignore
+!backend/storage/framework/sessions/.gitignore
+!backend/storage/framework/views/.gitignore
+!backend/storage/framework/testing/.gitignore
+!backend/storage/logs/.gitignore
+
+# SQLite databases
+backend/database/*.sqlite
+backend/database/*.sqlite-journal
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# NPM & Yarn debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

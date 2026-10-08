@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+body {
+  background-color: #ffffff;
+  color: #09090b;
+}
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1deg);
+  }
+}
+
+@keyframes steam-rise {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-18px) scale(1.3);
+    opacity: 0;
+  }
+}
+
+@keyframes spark-flash {
+  0%, 100% { opacity: 0.2; transform: scale(0.9); }
+  25% { opacity: 1; transform: scale(1.15) rotate(10deg); }
+  75% { opacity: 0.4; transform: scale(0.8) rotate(-10deg); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes eye-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+.anim-float {
+  animation: float-slow 4s ease-in-out infinite;
+}
+
+.anim-steam-1 {
+  animation: steam-rise 2.4s ease-out infinite;
+}
+
+.anim-steam-2 {
+  animation: steam-rise 2.4s ease-out infinite 0.8s;
+}
+
+.anim-steam-3 {
+  animation: steam-rise 2.4s ease-out infinite 1.6s;
+}
+
+.anim-spark {
+  animation: spark-flash 0.8s ease-in-out infinite alternate;
+}
+
+.anim-pulse-glow {
+  animation: pulse-glow 3.5s ease-in-out infinite;
+}
+
+.anim-spin-slow {
+  animation: spin-slow 16s linear infinite;
+}
+
+.anim-blink {
+  transform-origin: center;
+  animation: eye-blink 4s infinite;
+}
+
