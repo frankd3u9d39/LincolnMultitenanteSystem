@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { ApiError } from '@/services/api';
+import { requestPasswordReset } from '@/services/auth';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -20,11 +22,14 @@ export default function ForgotPasswordPage() {
 
     setIsLoading(true);
 
-    // Simulate sending reset instructions
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await requestPasswordReset(email.trim());
       setIsSubmitted(true);
-    }, 800);
+    } catch (error) {
+      setErrorMessage(error instanceof ApiError ? error.message : 'We could not send the reset link. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

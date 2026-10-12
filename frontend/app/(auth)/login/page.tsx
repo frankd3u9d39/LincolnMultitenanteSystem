@@ -1,11 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { homePathFor, safeNextPath, useAuth } from '@/lib/auth';
+import { ApiError } from '@/services/api';
+import { MfaRequiredError } from '@/services/auth';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { user, status, signIn } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -13,6 +17,15 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [needsCode, setNeedsCode] = useState(false);
+  const [code, setCode] = useState('');
+
+  // Someone who is already signed in has no reason to see the form.
+  useEffect(() => {
+    if (status === 'authenticated' && user) {
+      router.replace(homePathFor(user.role));
+    }
+  }, [status, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,13 +40,28 @@ export default function LoginPage() {
       return;
     }
 
+    if (needsCode && !code.trim()) {
+      setErrorMessage('Enter the 6-digit code from your authenticator app, or a recovery code.');
+      return;
+    }
+
     setIsLoading(true);
 
-    // Simulate authentication processing
-    setTimeout(() => {
+    try {
+      const signedIn = await signIn(email.trim(), password, { code: code.trim() || undefined, remember: rememberMe });
+      const next = safeNextPath(new URLSearchParams(window.location.search).get('next'));
+      router.replace(next ?? homePathFor(signedIn.role));
+    } catch (error) {
+      if (error instanceof MfaRequiredError) {
+        setNeedsCode(true);
+        setErrorMessage(error.message);
+      } else if (error instanceof ApiError) {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage('Something went wrong signing you in. Please try again.');
+      }
       setIsLoading(false);
-      router.push('/dashboard');
-    }, 800);
+    }
   };
 
   return (
@@ -195,6 +223,28 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
+
+              {needsCode && (
+                <div>
+                  <label htmlFor="mfa-code" className="block text-xs font-semibold text-zinc-700 mb-1.5">
+                    Authenticator code
+                  </label>
+                  <input
+                    id="mfa-code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="000000"
+                    className="w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 font-mono tracking-[0.3em] text-center focus:border-[#B81D22] focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 transition-colors"
+                  />
+                  <p className="mt-1.5 text-[11px] text-zinc-500">
+                    Lost your device? Enter one of your recovery codes instead.
+                  </p>
+                </div>
+              )}
 
               {/* Remember Me */}
               <div className="flex items-center justify-between pt-1">

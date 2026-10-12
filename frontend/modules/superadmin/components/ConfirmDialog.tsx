@@ -12,7 +12,8 @@ export interface ConfirmRequest {
   tone?: 'default' | 'danger';
   /** When set, the operator must type this exact word before the action unlocks. */
   typeToConfirm?: string;
-  onConfirm: () => void;
+  /** May be async; the dialog stays open and busy until it settles. */
+  onConfirm: () => void | Promise<void>;
 }
 
 interface ConfirmDialogProps {
@@ -23,6 +24,7 @@ interface ConfirmDialogProps {
 /** Confirmation step for actions that change or revoke access. */
 export function ConfirmDialog({ request, onClose }: ConfirmDialogProps) {
   const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
   const unlocked = !request.typeToConfirm || typed.trim().toUpperCase() === request.typeToConfirm.toUpperCase();
   const danger = request.tone === 'danger';
 
@@ -36,13 +38,17 @@ export function ConfirmDialog({ request, onClose }: ConfirmDialogProps) {
         <>
           <ModalSecondaryButton onClick={onClose}>Cancel</ModalSecondaryButton>
           <ModalPrimaryButton
-            disabled={!unlocked}
-            onClick={() => {
-              request.onConfirm();
-              onClose();
+            disabled={!unlocked || busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await request.onConfirm();
+              } finally {
+                onClose();
+              }
             }}
           >
-            {request.confirmLabel}
+            {busy ? 'Working…' : request.confirmLabel}
           </ModalPrimaryButton>
         </>
       }

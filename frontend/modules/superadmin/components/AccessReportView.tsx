@@ -2,7 +2,9 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ADMINISTRATORS, DIRECTORY_SNAPSHOT_DATE } from '../services';
+import { listAdministrators } from '../services/api';
+import { useAsync } from '../hooks';
+import { ErrorBlock, LoadingBlock } from './LoadState';
 import {
   ADMIN_ROLE_LABELS,
   ADMIN_STATUS_STYLES,
@@ -21,15 +23,22 @@ const FLAG_ORDER: RiskFlag[] = ['locked', 'disabled', 'no_mfa', 'never_signed_in
 export function AccessReportView() {
   const [flagFilter, setFlagFilter] = useState<'all' | RiskFlag>('all');
 
-  const summary = useMemo(() => accessPostureSummary(ADMINISTRATORS, DIRECTORY_SNAPSHOT_DATE), []);
-  const tenants = useMemo(() => tenantPosture(ADMINISTRATORS, DIRECTORY_SNAPSHOT_DATE), []);
+  const { data, loading, error, reload } = useAsync((signal) => listAdministrators(signal), []);
+  const administrators = useMemo(() => data ?? [], [data]);
+
+  // The report is computed from the live administrator directory as of today.
+  const snapshotDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const summary = useMemo(() => accessPostureSummary(administrators, snapshotDate), [administrators, snapshotDate]);
+  const tenants = useMemo(() => tenantPosture(administrators, snapshotDate), [administrators, snapshotDate]);
 
   const flagged = useMemo(
     () =>
-      ADMINISTRATORS.map((admin) => ({ admin, flags: riskFlagsFor(admin, DIRECTORY_SNAPSHOT_DATE) }))
+      administrators
+        .map((admin) => ({ admin, flags: riskFlagsFor(admin, snapshotDate) }))
         .filter((entry) => entry.flags.length > 0)
         .sort((a, b) => b.flags.length - a.flags.length || a.admin.fullName.localeCompare(b.admin.fullName)),
-    []
+    [administrators, snapshotDate]
   );
 
   const visible = flagFilter === 'all' ? flagged : flagged.filter((entry) => entry.flags.includes(flagFilter));
@@ -44,6 +53,14 @@ export function AccessReportView() {
 
   const coverageTone =
     summary.mfaCoverage >= 90 ? 'bg-emerald-500' : summary.mfaCoverage >= 70 ? 'bg-amber-500' : 'bg-[#B81D22]';
+
+  if (loading) {
+    return <LoadingBlock rows={6} label="Loading access report" />;
+  }
+
+  if (error) {
+    return <ErrorBlock message={error} onRetry={reload} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -66,7 +83,7 @@ export function AccessReportView() {
             </h1>
             <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
               Multi-factor coverage, dormant credentials, and lockouts across every tenant boundary &bull; snapshot{' '}
-              <span className="font-mono">{DIRECTORY_SNAPSHOT_DATE}</span>
+              <span className="font-mono">{snapshotDate}</span>
             </p>
           </div>
 
@@ -211,7 +228,7 @@ export function AccessReportView() {
 
         <div className="space-y-2.5">
           {visible.map(({ admin, flags }) => {
-            const days = daysSinceLogin(admin.lastLogin, DIRECTORY_SNAPSHOT_DATE);
+            const days = daysSinceLogin(admin.lastLogin, snapshotDate);
             return (
               <div
                 key={admin.id}

@@ -50,12 +50,3 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     return false;
   }
 }
-
-const KEY_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
-
-/** Generates a mock credential string of the given length. */
-export function randomToken(length: number): string {
-  const values = new Uint32Array(length);
-  crypto.getRandomValues(values);
-  return Array.from(values, (value) => KEY_ALPHABET[value % KEY_ALPHABET.length]).join('');
-}

@@ -1,150 +1,66 @@
 'use client';
 
-import React, { useState } from 'react';
-import { downloadCsv } from '@/modules/superadmin/utils';
+import React, { useEffect, useState } from 'react';
+import { ApiError } from '@/services/api';
+import { AuditLogEntry, AuditSeverity } from '@/modules/superadmin/types';
+import { downloadAuditLog, listAuditLogs } from '@/modules/superadmin/services/api';
+import { useAsync, useNotice } from '@/modules/superadmin/hooks';
+import { ErrorBlock, LoadingBlock, NoticeBanner } from '@/modules/superadmin/components';
 
-interface AuditLog {
-  id: number;
-  timestamp: string;
-  eventType: string;
-  action: string;
-  severity: 'info' | 'warning' | 'critical';
-  actorName: string;
-  actorEmail: string;
-  actorRole: string;
-  schoolName: string;
-  ipAddress: string;
-  userAgent: string;
-  description: string;
-  details?: Record<string, string | number | boolean>;
-}
-
-const INITIAL_AUDIT_LOGS: AuditLog[] = [
-  {
-    id: 1,
-    timestamp: '2026-09-24 10:45:00',
-    eventType: 'auth.login.success',
-    action: 'SuperAdmin Authentication',
-    severity: 'info',
-    actorName: 'Alexander Cross',
-    actorEmail: 'admin@lincolnplatform.io',
-    actorRole: 'SuperAdmin',
-    schoolName: 'Platform Global',
-    ipAddress: '192.168.1.100',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0',
-    description: 'Alexander Cross successfully authenticated via multi-factor auth.',
-    details: { auth_method: 'TOTP_2FA', session_duration: 120, privileged: true },
-  },
-  {
-    id: 2,
-    timestamp: '2026-09-24 09:30:12',
-    eventType: 'tenant.provisioned',
-    action: 'Provisioned School Tenant',
-    severity: 'info',
-    actorName: 'Alexander Cross',
-    actorEmail: 'admin@lincolnplatform.io',
-    actorRole: 'SuperAdmin',
-    schoolName: 'Evergreen Institute of Technology',
-    ipAddress: '192.168.1.100',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0',
-    description: 'Provisioned new school tenant #18 with a 250 GB storage quota.',
-    details: { tenant_id: 18, code: 'EIT-SMTS-018', storage_quota_gb: 250, admin_assigned: true },
-  },
-  {
-    id: 3,
-    timestamp: '2026-09-24 03:15:22',
-    eventType: 'auth.failed_attempt',
-    action: 'Suspicious Brute-Force Login',
-    severity: 'critical',
-    actorName: 'Unknown (Attacker)',
-    actorEmail: 'admin@lincoln.edu',
-    actorRole: 'Unauthenticated',
-    schoolName: 'Lincoln College',
-    ipAddress: '185.220.101.45',
-    userAgent: 'Python-Requests/2.28.1 (Scraper)',
-    description: 'Multiple failed password attempts detected from blacklisted TOR exit node.',
-    details: { attempts_count: 5, auto_blocked: true, geo: 'Unknown / Proxy' },
-  },
-  {
-    id: 4,
-    timestamp: '2026-09-23 16:00:45',
-    eventType: 'tenant.quota_raised',
-    action: 'Raised Tenant Storage Quota',
-    severity: 'info',
-    actorName: 'Alexander Cross',
-    actorEmail: 'admin@lincolnplatform.io',
-    actorRole: 'SuperAdmin',
-    schoolName: 'Lincoln College of Science Management & Technology',
-    ipAddress: '192.168.1.100',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0',
-    description: 'Raised Lincoln College storage quota from 500 GB to 1 TB.',
-    details: { old_quota_gb: 500, new_quota_gb: 1000, reason: 'Archive migration' },
-  },
-  {
-    id: 5,
-    timestamp: '2026-09-23 14:15:10',
-    eventType: 'tenant.suspended',
-    action: 'Suspended School Tenant',
-    severity: 'warning',
-    actorName: 'Alexander Cross',
-    actorEmail: 'admin@lincolnplatform.io',
-    actorRole: 'SuperAdmin',
-    schoolName: 'Vanguard Institute of Sciences',
-    ipAddress: '192.168.1.100',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0',
-    description: 'Suspended Vanguard Institute account after 180 days with no sign-in activity.',
-    details: { tenant_id: 20, inactive_days: 180, reason: 'Dormant tenant policy' },
-  },
-  {
-    id: 6,
-    timestamp: '2026-09-23 11:20:00',
-    eventType: 'platform.setting_updated',
-    action: 'Updated Security Policy',
-    severity: 'warning',
-    actorName: 'Elena Rostova',
-    actorEmail: 'e.rostova@lincolnplatform.io',
-    actorRole: 'SuperAdmin',
-    schoolName: 'Platform Global',
-    ipAddress: '192.168.1.102',
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-    description: 'Enforced mandatory TOTP MFA for all SuperAdmin and School Administrator roles.',
-    details: { key: 'mfa_enforced_superadmin', old_value: false, new_value: true },
-  },
-  {
-    id: 7,
-    timestamp: '2026-09-23 09:00:15',
-    eventType: 'user.created',
-    action: 'Admitted Student Record',
-    severity: 'info',
-    actorName: 'Dr. Sarah Jenkins',
-    actorEmail: 's.jenkins@lincoln.edu',
-    actorRole: 'School Admin',
-    schoolName: 'Lincoln College of Science Management & Technology',
-    ipAddress: '82.165.197.1',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-    description: 'Registered new student Liam Chen (ID: 11) into Computer Science 2025/2026 cohort.',
-    details: { student_id: 11, admission_cohort: '2025/2026', department: 'Computer Science' },
-  },
-];
+const PAGE_SIZE = 15;
 
 export default function SecurityAuditLogsPage() {
-  const [logs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
-  const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
+  const [selectedSeverity, setSelectedSeverity] = useState<'all' | AuditSeverity>('all');
   const [selectedEventType, setSelectedEventType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeLogModal, setActiveLogModal] = useState<AuditLog | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
+  const [page, setPage] = useState(1);
+  const [activeLogModal, setActiveLogModal] = useState<AuditLogEntry | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const { notice, notify, dismiss } = useNotice();
 
-  const filteredLogs = logs.filter((log) => {
-    const matchesSeverity = selectedSeverity === 'all' || log.severity === selectedSeverity;
-    const matchesType = selectedEventType === 'all' || log.eventType.startsWith(selectedEventType);
-    const matchesSearch =
-      log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.actorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.actorEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.schoolName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.ipAddress.includes(searchQuery);
-    return matchesSeverity && matchesType && matchesSearch;
-  });
+  // Search waits for a pause in typing so each keystroke is not a request.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const { data, loading, refreshing, error, reload } = useAsync(
+    (signal) =>
+      listAuditLogs(
+        { severity: selectedSeverity, eventGroup: selectedEventType, search: debouncedSearch, page, perPage: PAGE_SIZE },
+        signal
+      ),
+    [selectedSeverity, selectedEventType, debouncedSearch, page]
+  );
+
+  const logs = data?.items ?? [];
+  const headline = data?.headline;
+  const pageCount = Math.max(1, data?.lastPage ?? 1);
+  const currentPage = data?.page ?? 1;
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const fileName = await downloadAuditLog({ severity: selectedSeverity, eventGroup: selectedEventType, search: debouncedSearch });
+      notify(`Audit log exported to ${fileName}.`);
+    } catch (failure) {
+      notify(failure instanceof ApiError ? failure.message : 'The audit log could not be exported.', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  if (loading) {
+    return <LoadingBlock rows={6} label="Loading audit log" />;
+  }
+
+  if (error && !data) {
+    return <ErrorBlock message={error} onRetry={reload} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -166,51 +82,26 @@ export default function SecurityAuditLogsPage() {
           </div>
           <button
             type="button"
-            onClick={() => {
-              downloadCsv(
-                'security_audit_log',
-                [
-                  'Timestamp',
-                  'Event Type',
-                  'Severity',
-                  'Actor',
-                  'Actor Email',
-                  'Actor Role',
-                  'School',
-                  'IP Address',
-                  'Description',
-                  'User Agent',
-                ],
-                filteredLogs.map((log) => [
-                  log.timestamp,
-                  log.eventType,
-                  log.severity,
-                  log.actorName,
-                  log.actorEmail,
-                  log.actorRole,
-                  log.schoolName,
-                  log.ipAddress,
-                  log.description,
-                  log.userAgent,
-                ])
-              );
-            }}
-            className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 flex items-center gap-1.5"
+            onClick={handleExport}
+            disabled={exporting}
+            className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            <span>Download Audit Log</span>
+            <span>{exporting ? 'Preparing…' : 'Download Audit Log'}</span>
           </button>
         </div>
       </div>
+
+      <NoticeBanner notice={notice} onDismiss={dismiss} />
 
       {/* 3 Metric Pills */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[11px] font-semibold uppercase text-zinc-400 block">Total Recorded Events</span>
-            <span className="text-2xl font-black text-zinc-900">1,420</span>
+            <span className="text-2xl font-black text-zinc-900">{(headline?.totalEvents ?? 0).toLocaleString()}</span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center text-zinc-600 font-bold">
             All
@@ -219,8 +110,8 @@ export default function SecurityAuditLogsPage() {
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-semibold uppercase text-zinc-400 block">Flagged Security Anomalies (24h)</span>
-            <span className="text-2xl font-black text-red-600">1</span>
+            <span className="text-[11px] font-semibold uppercase text-zinc-400 block">Critical Events (24h)</span>
+            <span className="text-2xl font-black text-red-600">{headline?.criticalLast24h ?? 0}</span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 border border-red-200 flex items-center justify-center font-bold">
             !
@@ -230,7 +121,7 @@ export default function SecurityAuditLogsPage() {
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[11px] font-semibold uppercase text-zinc-400 block">Administrative Changes</span>
-            <span className="text-2xl font-black text-blue-600">6</span>
+            <span className="text-2xl font-black text-blue-600">{(headline?.administrativeChanges ?? 0).toLocaleString()}</span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center font-bold">
             Gov
@@ -247,7 +138,10 @@ export default function SecurityAuditLogsPage() {
               <button
                 key={sev}
                 type="button"
-                onClick={() => setSelectedSeverity(sev)}
+                onClick={() => {
+                  setSelectedSeverity(sev as 'all' | AuditSeverity);
+                  setPage(1);
+                }}
                 className={`px-3 py-1 text-xs font-bold rounded-lg capitalize transition-colors ${
                   selectedSeverity === sev
                     ? 'bg-white text-zinc-900 shadow-sm'
@@ -264,7 +158,10 @@ export default function SecurityAuditLogsPage() {
             <span className="text-zinc-400">Category:</span>
             <select
               value={selectedEventType}
-              onChange={(e) => setSelectedEventType(e.target.value)}
+              onChange={(e) => {
+                setSelectedEventType(e.target.value);
+                setPage(1);
+              }}
               className="px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20"
             >
               <option value="all">All Event Categories</option>
@@ -302,7 +199,7 @@ export default function SecurityAuditLogsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 text-zinc-700">
-              {filteredLogs.map((log) => (
+              {logs.map((log) => (
                 <tr key={log.id} className="hover:bg-zinc-50/60 transition-colors">
                   <td className="py-3 px-3 font-mono text-[11px] text-zinc-500 whitespace-nowrap">
                     {log.timestamp}
@@ -326,7 +223,7 @@ export default function SecurityAuditLogsPage() {
                   </td>
                   <td className="py-3 px-3">
                     <div className="font-medium text-zinc-900">{log.actorName}</div>
-                    <div className="text-[11px] text-zinc-500">{log.actorEmail}</div>
+                    <div className="text-[11px] text-zinc-500">{log.actorEmail ?? '—'}</div>
                   </td>
                   <td className="py-3 px-3">
                     <span className="font-medium text-zinc-800 truncate max-w-[180px] block">
@@ -334,7 +231,7 @@ export default function SecurityAuditLogsPage() {
                     </span>
                   </td>
                   <td className="py-3 px-3 font-mono text-[11px] text-zinc-500">
-                    {log.ipAddress}
+                    {log.ipAddress ?? '—'}
                   </td>
                   <td className="py-3 px-3 text-right">
                     <button
@@ -347,8 +244,40 @@ export default function SecurityAuditLogsPage() {
                   </td>
                 </tr>
               ))}
+              {logs.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-10 text-center text-zinc-400 text-xs">
+                    No events match the current filters.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <span className="text-[11px] text-zinc-500">
+            Page <span className="font-bold text-zinc-800">{currentPage}</span> of {pageCount}
+            <span className="ml-2">&bull; {(data?.total ?? 0).toLocaleString()} matching events{refreshing ? ' …' : ''}</span>
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setPage(currentPage - 1)}
+              className="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              disabled={currentPage >= pageCount}
+              onClick={() => setPage(currentPage + 1)}
+              className="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
 
@@ -381,7 +310,7 @@ export default function SecurityAuditLogsPage() {
             </div>
 
             <p className="text-xs text-zinc-600 leading-relaxed bg-zinc-50 p-3 rounded-xl border border-zinc-100">
-              {activeLogModal.description}
+              {activeLogModal.description ?? 'No description recorded.'}
             </p>
 
             <div className="space-y-2 text-xs font-mono">
@@ -403,12 +332,12 @@ export default function SecurityAuditLogsPage() {
               </div>
               <div className="flex justify-between py-1 border-b border-zinc-100">
                 <span className="text-zinc-400">IP Address</span>
-                <span className="text-zinc-800">{activeLogModal.ipAddress}</span>
+                <span className="text-zinc-800">{activeLogModal.ipAddress ?? '—'}</span>
               </div>
               <div className="pt-2">
                 <span className="text-zinc-400 block mb-1">User Agent Header</span>
                 <span className="text-[11px] text-zinc-600 break-all bg-zinc-100 p-2 rounded-lg block">
-                  {activeLogModal.userAgent}
+                  {activeLogModal.userAgent ?? 'Not recorded'}
                 </span>
               </div>
               {activeLogModal.details && (

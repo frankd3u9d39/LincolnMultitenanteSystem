@@ -18,14 +18,17 @@ export interface OnboardDraft {
 
 interface OnboardSchoolModalProps {
   onClose: () => void;
-  onProvision: (draft: OnboardDraft) => void;
+  /** Resolves with field errors from the server when it rejects the draft, or nothing on success. */
+  onProvision: (draft: OnboardDraft) => Promise<ProvisionErrors | void>;
   existingCodes: string[];
   existingDomains: string[];
   /** Used to suggest the next sequential tenant code. */
   nextSequence: number;
 }
 
-type FieldErrors = Partial<Record<'name' | 'code' | 'domain' | 'city' | 'principalAdmin' | 'principalEmail', string>>;
+export type ProvisionErrors = Partial<Record<'name' | 'code' | 'domain' | 'city' | 'principalAdmin' | 'principalEmail' | 'form', string>>;
+
+type FieldErrors = ProvisionErrors;
 
 /** Derives an acronym-style tenant code prefix from the school name. */
 function suggestPrefix(name: string): string {
@@ -56,6 +59,7 @@ export function OnboardSchoolModal({
     activateImmediately: false,
   });
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [submitting, setSubmitting] = useState(false);
   const [codeTouched, setCodeTouched] = useState(false);
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
@@ -94,13 +98,14 @@ export function OnboardSchoolModal({
     return next;
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const found = validate();
     setErrors(found);
     if (Object.keys(found).length > 0) return;
 
-    onProvision({
+    setSubmitting(true);
+    const rejected = await onProvision({
       ...draft,
       name: draft.name.trim(),
       code: draft.code.trim().toUpperCase(),
@@ -109,6 +114,11 @@ export function OnboardSchoolModal({
       principalAdmin: draft.principalAdmin.trim(),
       principalEmail: draft.principalEmail.trim().toLowerCase(),
     });
+    setSubmitting(false);
+
+    if (rejected) {
+      setErrors(rejected);
+    }
   };
 
   const inputClass = (field: keyof FieldErrors) =>
@@ -132,11 +142,18 @@ export function OnboardSchoolModal({
         footer={
           <>
             <ModalSecondaryButton onClick={onClose}>Cancel</ModalSecondaryButton>
-            <ModalPrimaryButton type="submit">Provision Tenant</ModalPrimaryButton>
+            <ModalPrimaryButton type="submit" disabled={submitting}>
+              {submitting ? 'Provisioning…' : 'Provision Tenant'}
+            </ModalPrimaryButton>
           </>
         }
       >
         <div className="space-y-4">
+          {errors.form && (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800">
+              {errors.form}
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className={labelClass} htmlFor="onboard-name">Registered School Name</label>

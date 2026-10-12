@@ -2,16 +2,39 @@
 
 import React, { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { ApiError } from '@/services/api';
 import { SchoolTenant, TenantStatus } from '../types';
-import { SCHOOL_TENANTS } from '../services';
-import { useNotice } from '../hooks';
+import {
+  changeTenantQuota,
+  listTenants,
+  logSupportAccess,
+  provisionTenant,
+  reinstateTenant,
+  suspendTenant,
+} from '../services/api';
+import { useAsync, useNotice } from '../hooks';
 import { TENANT_STATUS_STYLES, downloadCsv, storageUsagePercent } from '../utils';
 import { NoticeBanner } from './NoticeBanner';
+import { ErrorBlock, LoadingBlock } from './LoadState';
 import { ConfirmDialog, ConfirmRequest } from './ConfirmDialog';
-import { OnboardDraft, OnboardSchoolModal } from './OnboardSchoolModal';
-import { StorageQuotaModal } from './TenantDialogs';
+import { OnboardDraft, OnboardSchoolModal, ProvisionErrors } from './OnboardSchoolModal';
+import { StorageQuotaModal, SupportAccessModal } from './TenantDialogs';
 
 type SortKey = 'name' | 'students' | 'storageUsedGb';
+
+const failureMessage = (error: unknown) =>
+  error instanceof ApiError ? error.message : 'Something went wrong. Please try again.';
+
+/** Maps the API's field names onto the onboarding form's fields. */
+const PROVISION_FIELDS: Record<string, keyof ProvisionErrors> = {
+  name: 'name',
+  code: 'code',
+  domain: 'domain',
+  city: 'city',
+  principal_admin: 'principalAdmin',
+  principal_email: 'principalEmail',
+  storage_quota_gb: 'form',
+};
 
 export function SchoolsRegistryView() {
   const router = useRouter();
@@ -22,10 +45,13 @@ export function SchoolsRegistryView() {
   const [sortKey, setSortKey] = useState<SortKey>('students');
   const [sortDesc, setSortDesc] = useState(true);
 
-  const [tenants, setTenants] = useState<SchoolTenant[]>(SCHOOL_TENANTS);
+  const { data, loading, error, reload, setData } = useAsync((signal) => listTenants(signal), []);
+  const tenants = useMemo(() => data ?? [], [data]);
+
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [onboardOpenedHere, setOnboardOpenedHere] = useState(false);
   const [quotaTarget, setQuotaTarget] = useState<SchoolTenant | null>(null);
+  const [supportTarget, setSupportTarget] = useState<SchoolTenant | null>(null);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const { notice, notify, dismiss } = useNotice();
 
@@ -49,64 +75,68 @@ export function SchoolsRegistryView() {
     if (searchParams.get('onboard')) router.replace('/superadmin/schools');
   };
 
-  const handleProvision = (draft: OnboardDraft) => {
-    const tenant: SchoolTenant = {
-      id: Math.max(0, ...tenants.map((item) => item.id)) + 1,
-      name: draft.name,
-      code: draft.code,
-      domain: draft.domain,
-      status: draft.activateImmediately ? 'active' : 'pending',
-      students: 0,
-      teachers: 0,
-      storageUsedGb: 0,
-      storageQuotaGb: draft.storageQuotaGb,
-      principalAdmin: draft.principalAdmin,
-      principalEmail: draft.principalEmail,
-      city: draft.city,
-      onboardedOn: '2026-10-04',
-      lastActivity: 'Awaiting first sign-in',
-    };
+  const replaceTenant = (updated: SchoolTenant) =>
+    setData((previous) => (previous ?? []).map((item) => (item.id === updated.id ? updated : item)));
 
-    setTenants((prev) => [tenant, ...prev]);
-    setStatusFilter('all');
-    setQuery('');
-    clearOnboardParam();
-    setSelectedId(tenant.id);
-    notify(
-      `${tenant.name} provisioned as ${tenant.code} with a ${draft.storageQuotaGb.toLocaleString()} GB quota.${
-        draft.activateImmediately ? ' The school is live now.' : ' It stays pending until the domain is verified.'
-      }`
-    );
+  const handleProvision = async (draft: OnboardDraft): Promise<ProvisionErrors | void> => {
+    try {
+      const { tenant, message } = await provisionTenant({
+        name: draft.name,
+        code: draft.code,
+        domain: draft.domain,
+        city: draft.city,
+        principalAdmin: draft.principalAdmin,
+        principalEmail: draft.principalEmail,
+        storageQuotaGb: draft.storageQuotaGb,
+        activateImmediately: draft.activateImmediately,
+      });
+
+      setData((previous) => [tenant, ...(previous ?? [])]);
+      setStatusFilter('all');
+      setQuery('');
+      clearOnboardParam();
+      setSelectedId(tenant.id);
+      notify(message + (draft.activateImmediately ? ' The school is live now.' : ' It stays pending until the domain is verified.'));
+    } catch (failure) {
+      if (failure instanceof ApiError && failure.status === 422) {
+        const mapped: ProvisionErrors = {};
+        Object.entries(failure.errors).forEach(([field, messages]) => {
+          mapped[PROVISION_FIELDS[field] ?? 'form'] = messages[0];
+        });
+        return mapped;
+      }
+      return { form: failureMessage(failure) };
+    }
   };
 
-  const handleQuotaChange = (tenant: SchoolTenant, storageQuotaGb: number) => {
-    setTenants((prev) => prev.map((item) => (item.id === tenant.id ? { ...item, storageQuotaGb } : item)));
-    notify(`${tenant.name} storage quota set to ${storageQuotaGb.toLocaleString()} GB.`);
+  const handleQuotaChange = async (tenant: SchoolTenant, storageQuotaGb: number): Promise<string | void> => {
+    try {
+      const result = await changeTenantQuota(tenant.id, storageQuotaGb);
+      replaceTenant(result.tenant);
+      notify(result.message);
+    } catch (failure) {
+      return failureMessage(failure);
+    }
   };
 
-  const handleToggleSuspension = (tenant: SchoolTenant) => {
+  const handleToggleSuspension = async (tenant: SchoolTenant) => {
     const reinstating = tenant.status === 'suspended';
-    setTenants((prev) =>
-      prev.map((item) =>
-        item.id === tenant.id ? { ...item, status: reinstating ? 'active' : 'suspended' } : item
-      )
-    );
-    notify(
-      reinstating
-        ? `${tenant.name} reinstated. Campus portals are reachable again.`
-        : `${tenant.name} suspended. All campus sign-ins are now blocked.`,
-      reinstating ? 'success' : 'warning'
-    );
+
+    try {
+      const result = reinstating ? await reinstateTenant(tenant.id) : await suspendTenant(tenant.id, 'Suspended from the tenant registry');
+      replaceTenant(result.tenant);
+      notify(result.message, reinstating ? 'success' : 'warning');
+    } catch (failure) {
+      notify(failureMessage(failure), 'error');
+    }
   };
 
-  const handleGrantAccess = (tenant: SchoolTenant) => {
-    setTenants((prev) =>
-      prev.map((item) => (item.id === tenant.id ? { ...item, lastActivity: 'SuperAdmin session active' } : item))
-    );
-    notify(
-      `Support session opened on ${tenant.name}. It expires in 30 minutes and every action is written to the audit trail.`,
-      'info'
-    );
+  const handleSupportAccess = async (tenant: SchoolTenant, reason: string): Promise<string | void> => {
+    try {
+      notify(await logSupportAccess(tenant.id, reason), 'info');
+    } catch (failure) {
+      return failureMessage(failure);
+    }
   };
 
   const totals = useMemo(
@@ -152,6 +182,14 @@ export function SchoolsRegistryView() {
   };
 
   const sortCaret = (key: SortKey) => (sortKey === key ? (sortDesc ? ' ▾' : ' ▴') : '');
+
+  if (loading) {
+    return <LoadingBlock rows={6} label="Loading tenants" />;
+  }
+
+  if (error) {
+    return <ErrorBlock message={error} onRetry={reload} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -412,24 +450,10 @@ export function SchoolsRegistryView() {
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  setConfirmRequest({
-                    eyebrow: 'Tenant Access',
-                    title: 'Open a support session?',
-                    confirmLabel: 'Open Session',
-                    body: (
-                      <>
-                        You will be signed in to <strong>{selected.name}</strong> as a SuperAdmin observer for 30
-                        minutes. The tenant&apos;s administrators are notified, and every action you take is
-                        recorded in the platform audit trail.
-                      </>
-                    ),
-                    onConfirm: () => handleGrantAccess(selected),
-                  })
-                }
+                onClick={() => setSupportTarget(selected)}
                 className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-white/60 transition-colors shadow-sm"
               >
-                Request Access
+                Log Support Access
               </button>
               <button
                 type="button"
@@ -479,6 +503,14 @@ export function SchoolsRegistryView() {
           tenant={quotaTarget}
           onClose={() => setQuotaTarget(null)}
           onApply={(quota) => handleQuotaChange(quotaTarget, quota)}
+        />
+      )}
+
+      {supportTarget && (
+        <SupportAccessModal
+          tenant={supportTarget}
+          onClose={() => setSupportTarget(null)}
+          onSubmit={(reason) => handleSupportAccess(supportTarget, reason)}
         />
       )}
       {confirmRequest && (

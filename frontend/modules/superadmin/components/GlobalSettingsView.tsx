@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ApiAccessKey, GlobalSettingsState } from '../types';
-import { useNotice } from '../hooks';
+import { ApiError } from '@/services/api';
+import { AccountOverview, ActiveSession, ApiAccessKey, GlobalSettingsState } from '../types';
+import { getAccount, listApiKeys, listSessions, regenerateRecoveryCodes, revokeApiKey, signOutOtherSessions, updateAccount } from '../services/api';
+import { useAsync, useNotice } from '../hooks';
+import { ErrorBlock, LoadingBlock } from './LoadState';
 import { NoticeBanner } from './NoticeBanner';
 import { ConfirmDialog, ConfirmRequest } from './ConfirmDialog';
 import {
@@ -11,34 +14,6 @@ import {
   MfaEnrolmentModal,
   RecoveryCodesModal,
 } from './AccountSecurityDialogs';
-
-const INITIAL_STATE: GlobalSettingsState = {
-  profile: {
-    fullName: 'Alexander Cross',
-    jobTitle: 'Chief Platform Administrator',
-    email: 'admin@lincolnplatform.io',
-    phone: '+234 802 000 1199',
-    timezone: 'Africa/Lagos (GMT+1)',
-    language: 'English (Nigeria)',
-    dateFormat: 'DD/MM/YYYY',
-  },
-  notifications: {
-    tenantOnboarded: true,
-    tenantSuspended: true,
-    quotaBreaches: true,
-    securityAlerts: true,
-    backupResults: false,
-    weeklyDigest: true,
-    channel: 'email_sms',
-  },
-  apiKeys: [
-    { id: 1, label: 'Attendance Sync Worker', prefix: 'lmp_live_8f2a', scope: 'read_only', createdOn: '2025-02-11', lastUsed: '2026-10-04 06:00', status: 'active' },
-    { id: 2, label: 'Tenant Provisioning Pipeline', prefix: 'lmp_live_c41d', scope: 'read_write', createdOn: '2025-06-03', lastUsed: '2026-10-03 22:14', status: 'active' },
-    { id: 3, label: 'Analytics Warehouse Sync', prefix: 'lmp_live_19be', scope: 'read_only', createdOn: '2024-10-28', lastUsed: '2026-10-04 02:30', status: 'active' },
-    { id: 4, label: 'Legacy Migration Script', prefix: 'lmp_live_7700', scope: 'admin', createdOn: '2023-05-14', lastUsed: '2024-01-09 11:42', status: 'revoked' },
-  ],
-};
-
 const TIMEZONES = [
   'Africa/Lagos (GMT+1)',
   'Africa/Accra (GMT+0)',
@@ -75,20 +50,6 @@ const SCOPE_LABELS: Record<ApiAccessKey['scope'], string> = {
   admin: 'Full admin',
 };
 
-interface ActiveSession {
-  device: string;
-  location: string;
-  ip: string;
-  seen: string;
-  current: boolean;
-}
-
-const INITIAL_SESSIONS: ActiveSession[] = [
-  { device: 'Chrome 141 on Windows 11', location: 'Lagos, Nigeria', ip: '197.210.54.12', seen: 'Current session', current: true },
-  { device: 'Safari on iPhone 16 Pro', location: 'Lagos, Nigeria', ip: '105.112.18.44', seen: '3 hours ago', current: false },
-  { device: 'Edge 140 on Windows 11', location: 'Abuja, Nigeria', ip: '102.89.33.17', seen: '2 days ago', current: false },
-];
-
 type Tab = 'profile' | 'notifications' | 'security' | 'api';
 
 const TABS: Array<{ id: Tab; label: string }> = [
@@ -98,23 +59,84 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'api', label: 'API Access Keys' },
 ];
 
+const failureMessage = (error: unknown) =>
+  error instanceof ApiError ? error.message : 'Something went wrong. Please try again.';
+
+interface LoadedAccount {
+  overview: AccountOverview;
+  sessions: ActiveSession[];
+  keys: ApiAccessKey[];
+}
+
+/** Loads the operator's account, sessions and keys, then hands them to the form. */
 export function GlobalSettingsView() {
+  const { data, loading, error, reload } = useAsync<LoadedAccount>(async (signal) => {
+    const [overview, sessions, keys] = await Promise.all([getAccount(signal), listSessions(signal), listApiKeys(signal)]);
+    return { overview, sessions, keys };
+  }, []);
+
+  if (loading) {
+    return <LoadingBlock rows={6} label="Loading your account" />;
+  }
+
+  if (error || !data) {
+    return <ErrorBlock message={error ?? 'Your account could not be loaded.'} onRetry={reload} />;
+  }
+
+  return <GlobalSettingsForm initial={data} />;
+}
+
+function GlobalSettingsForm({ initial }: { initial: LoadedAccount }) {
   const [activeTab, setActiveTab] = useState<Tab>('profile');
-  const [state, setState] = useState<GlobalSettingsState>(INITIAL_STATE);
-  const [savedAlert, setSavedAlert] = useState(false);
+  const [state, setState] = useState<GlobalSettingsState>({
+    profile: initial.overview.profile,
+    notifications: initial.overview.notifications,
+    apiKeys: initial.keys,
+  });
+  // The persisted profile and alert preferences; unsaved edits are measured against them.
+  const [saved, setSaved] = useState({ profile: initial.overview.profile, notifications: initial.overview.notifications });
+  const [summary, setSummary] = useState(initial.overview.summary);
+  const [security, setSecurity] = useState(initial.overview.security);
+  const [sessions, setSessions] = useState(initial.sessions);
+  const [saving, setSaving] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [mfaOpen, setMfaOpen] = useState(false);
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
   const [newKeyOpen, setNewKeyOpen] = useState(false);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
-  const [sessions, setSessions] = useState(INITIAL_SESSIONS);
-  const [mfaEnrolledOn, setMfaEnrolledOn] = useState('Authenticator app');
   const { notice, notify, dismiss } = useNotice();
 
-  const signOutOtherSessions = () => {
-    const removed = sessions.filter((session) => !session.current).length;
-    setSessions((prev) => prev.filter((session) => session.current));
-    notify(`Signed out ${removed} other device${removed === 1 ? '' : 's'}. Only this session remains active.`, 'warning');
+  const dirty =
+    JSON.stringify({ profile: state.profile, notifications: state.notifications }) !== JSON.stringify(saved);
+
+  const handleSignOutOthers = async () => {
+    try {
+      const result = await signOutOtherSessions();
+      setSessions(result.sessions);
+      notify(result.message, 'warning');
+    } catch (failure) {
+      notify(failureMessage(failure), 'error');
+    }
+  };
+
+  const handleRegenerateCodes = async () => {
+    try {
+      const codes = await regenerateRecoveryCodes();
+      setRecoveryCodes(codes);
+      setSecurity((previous) => ({ ...previous, recoveryCodesRemaining: codes.length }));
+    } catch (failure) {
+      notify(failureMessage(failure), 'error');
+    }
+  };
+
+  const handleRevokeKey = async (key: ApiAccessKey) => {
+    try {
+      const result = await revokeApiKey(key.id);
+      setState((prev) => ({ ...prev, apiKeys: result.keys }));
+      notify(result.message, 'warning');
+    } catch (failure) {
+      notify(failureMessage(failure), 'error');
+    }
   };
 
   const handleProfileChange = <K extends keyof GlobalSettingsState['profile']>(
@@ -127,16 +149,19 @@ export function GlobalSettingsView() {
     value: GlobalSettingsState['notifications'][K]
   ) => setState((prev) => ({ ...prev, notifications: { ...prev.notifications, [key]: value } }));
 
-  const handleRevokeKey = (id: number) =>
-    setState((prev) => ({
-      ...prev,
-      apiKeys: prev.apiKeys.map((key) => (key.id === id ? { ...key, status: 'revoked' } : key)),
-    }));
+  const handleSave = async () => {
+    setSaving(true);
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavedAlert(true);
-    setTimeout(() => setSavedAlert(false), 4000);
+    try {
+      const message = await updateAccount({ profile: state.profile, notifications: state.notifications });
+      setSaved({ profile: state.profile, notifications: state.notifications });
+      notify(message);
+    } catch (failure) {
+      const detail = failure instanceof ApiError ? Object.values(failure.errors)[0]?.[0] : undefined;
+      notify(detail ?? failureMessage(failure), 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const inputClass =
@@ -144,7 +169,8 @@ export function GlobalSettingsView() {
   const labelClass = 'block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5';
 
   return (
-    <form onSubmit={handleSave} className="space-y-6">
+    // A plain container, not a <form>: the dialogs below carry their own forms, and forms cannot nest.
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-zinc-200">
         <div>
@@ -157,32 +183,25 @@ export function GlobalSettingsView() {
         <div className="flex items-center gap-2.5">
           <button
             type="button"
-            onClick={() => setState(INITIAL_STATE)}
-            className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm"
+            onClick={() => setState((prev) => ({ ...prev, profile: saved.profile, notifications: saved.notifications }))}
+            disabled={!dirty || saving}
+            className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Discard Changes
           </button>
           <button
-            type="submit"
-            className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10"
+            type="button"
+            onClick={handleSave}
+            disabled={!dirty || saving}
+            className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Save Preferences
+            {saving ? 'Saving…' : 'Save Preferences'}
           </button>
         </div>
       </div>
 
       <NoticeBanner notice={notice} onDismiss={dismiss} />
 
-      {savedAlert && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 flex items-center gap-2">
-          <svg className="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-          <span className="text-xs font-semibold text-emerald-900">
-            Preferences saved. Changes have been written to the platform audit trail.
-          </span>
-        </div>
-      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-1.5 p-1 bg-zinc-100 rounded-xl overflow-x-auto">
@@ -320,11 +339,11 @@ export function GlobalSettingsView() {
 
             <div className="rounded-xl border border-zinc-200 divide-y divide-zinc-100 text-xs">
               {[
-                ['Platform Role', 'SuperAdmin (unrestricted)'],
-                ['Tenant Scope', 'All 21 boundaries'],
-                ['Account Created', '2022-07-01'],
-                ['Last Sign-in', '2026-10-04 08:42'],
-                ['Sign-in IP', '197.210.54.12'],
+                ['Platform Role', summary.role],
+                ['Tenant Scope', `All ${summary.tenantCount} boundaries`],
+                ['Account Created', summary.createdOn ?? '—'],
+                ['Last Sign-in', summary.lastSignIn ?? '—'],
+                ['Sign-in IP', summary.lastSignInIp ?? '—'],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-start justify-between gap-3 px-3 py-2.5">
                   <span className="text-zinc-500">{label}</span>
@@ -430,7 +449,12 @@ export function GlobalSettingsView() {
               <div className="flex items-center justify-between gap-3 px-3.5 py-3">
                 <div>
                   <div className="font-bold text-zinc-900">Password</div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5">Last changed 42 days ago &bull; expires in 48 days</div>
+                  <div className="text-[11px] text-zinc-500 mt-0.5">
+                    {security.passwordChangedDaysAgo === null
+                      ? 'Never changed'
+                      : `Last changed ${security.passwordChangedDaysAgo} day${security.passwordChangedDaysAgo === 1 ? '' : 's'} ago`}
+                    {security.passwordExpiresInDays !== null && ` \u2022 expires in ${security.passwordExpiresInDays} days`}
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -445,18 +469,28 @@ export function GlobalSettingsView() {
                 <div>
                   <div className="font-bold text-zinc-900 flex items-center gap-2">
                     Multi-Factor Authentication
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold uppercase">
-                      Enrolled
+                    <span
+                      className={`px-2 py-0.5 rounded-full border text-[10px] font-extrabold uppercase ${
+                        security.mfaEnabled
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}
+                    >
+                      {security.mfaEnabled ? 'Enrolled' : 'Not enrolled'}
                     </span>
                   </div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5">{mfaEnrolledOn} &bull; 8 recovery codes remaining</div>
+                  <div className="text-[11px] text-zinc-500 mt-0.5">
+                    {security.mfaEnabled
+                      ? `Authenticator app${security.mfaEnrolledOn ? ` since ${security.mfaEnrolledOn}` : ''} \u2022 ${security.recoveryCodesRemaining} recovery codes remaining`
+                      : 'Add an authenticator app to protect this account'}
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setMfaOpen(true)}
                   className="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shrink-0"
                 >
-                  Re-enrol
+                  {security.mfaEnabled ? 'Re-enrol' : 'Enrol'}
                 </button>
               </div>
 
@@ -479,7 +513,7 @@ export function GlobalSettingsView() {
                           you will need to store it somewhere safe.
                         </>
                       ),
-                      onConfirm: () => setRecoveryOpen(true),
+                      onConfirm: handleRegenerateCodes,
                     })
                   }
                   className="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shrink-0"
@@ -511,7 +545,7 @@ export function GlobalSettingsView() {
                         out at once. This device stays signed in.
                       </>
                     ),
-                    onConfirm: signOutOtherSessions,
+                    onConfirm: handleSignOutOthers,
                   })
                 }
                 className="px-3 py-1.5 rounded-lg border border-zinc-300 bg-white text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shrink-0"
@@ -523,7 +557,7 @@ export function GlobalSettingsView() {
             <div className="space-y-2.5 text-xs">
               {sessions.map((session) => (
                 <div
-                  key={session.ip}
+                  key={session.id}
                   className={`rounded-xl border p-3.5 ${session.current ? 'border-emerald-200 bg-emerald-50/50' : 'border-zinc-200 bg-zinc-50/50'}`}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -616,10 +650,7 @@ export function GlobalSettingsView() {
                                   be restored. Integrations using it will start returning 401 responses.
                                 </>
                               ),
-                              onConfirm: () => {
-                                handleRevokeKey(key.id);
-                                notify(`${key.label} revoked. Issue a replacement key before the integration next runs.`, 'warning');
-                              },
+                              onConfirm: () => handleRevokeKey(key),
                             })
                           }
                           className="text-[11px] font-semibold text-[#B81D22] hover:underline"
@@ -648,38 +679,50 @@ export function GlobalSettingsView() {
       {passwordOpen && (
         <ChangePasswordModal
           onClose={() => setPasswordOpen(false)}
-          onChanged={() => notify('Password updated. Your other devices have been signed out.')}
+          onChanged={(message) => {
+            setSecurity((previous) => ({ ...previous, passwordChangedDaysAgo: 0 }));
+            setSessions((previous) => previous.filter((session) => session.current));
+            notify(message);
+          }}
         />
       )}
 
       {mfaOpen && (
         <MfaEnrolmentModal
           onClose={() => setMfaOpen(false)}
-          onEnrolled={() => {
-            setMfaEnrolledOn('Authenticator app (re-enrolled today)');
-            notify('Authenticator replaced. Your previous factor no longer works.');
+          onNotify={(message) => notify(message)}
+          onEnrolled={(message) => {
+            setSecurity((previous) => ({
+              ...previous,
+              mfaEnabled: true,
+              mfaEnrolledOn: new Date().toISOString().slice(0, 10),
+              recoveryCodesRemaining: 8,
+            }));
+            notify(message);
           }}
         />
       )}
 
-      {recoveryOpen && (
-        <RecoveryCodesModal onClose={() => setRecoveryOpen(false)} onNotify={(message) => notify(message)} />
+      {recoveryCodes && (
+        <RecoveryCodesModal
+          codes={recoveryCodes}
+          onClose={() => setRecoveryCodes(null)}
+          onNotify={(message) => notify(message)}
+        />
       )}
 
       {newKeyOpen && (
         <CreateApiKeyModal
           onClose={() => setNewKeyOpen(false)}
-          existingLabels={state.apiKeys.map((key) => key.label)}
-          onCreate={(key) => {
-            setState((prev) => ({ ...prev, apiKeys: [key, ...prev.apiKeys] }));
-            notify(`${key.label} created. Copy the secret now — it is not shown again.`);
+          onCreated={(keys, message) => {
+            setState((prev) => ({ ...prev, apiKeys: keys }));
+            notify(message);
           }}
         />
       )}
-
       {confirmRequest && (
         <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
       )}
-    </form>
+    </div>
   );
 }

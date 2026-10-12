@@ -2,20 +2,39 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { ApiError } from '@/services/api';
 import { AdminAccountStatus, SchoolAdministrator } from '../types';
-import { ADMINISTRATORS, DIRECTORY_SNAPSHOT_DATE } from '../services';
+import {
+  enforceMfa as enforceMfaRequest,
+  inviteAdministrator,
+  listAdministrators,
+  listTenants,
+  sendPasswordResets,
+  setAdministratorStatus,
+} from '../services/api';
 import {
   ADMIN_ROLE_LABELS,
   ADMIN_ROLE_STYLES,
   ADMIN_STATUS_STYLES,
   adminInitials,
+  downloadCsv,
 } from '../utils';
-import { InviteAdministratorModal, InviteDraft } from './InviteAdministratorModal';
+import { useAsync, useNotice } from '../hooks';
+import { InviteAdministratorModal, InviteDraft, InviteErrors } from './InviteAdministratorModal';
 import { ConfirmDialog, ConfirmRequest } from './ConfirmDialog';
+import { ErrorBlock, LoadingBlock } from './LoadState';
 import { PermissionsModal } from './PermissionsModal';
 import { NoticeBanner } from './NoticeBanner';
-import { useNotice } from '../hooks';
-import { downloadCsv } from '../utils';
+
+const failureMessage = (error: unknown) =>
+  error instanceof ApiError ? error.message : 'Something went wrong. Please try again.';
+
+const INVITE_FIELDS: Record<string, keyof InviteErrors> = {
+  full_name: 'fullName',
+  email: 'email',
+  phone: 'phone',
+  school_code: 'schoolCode',
+};
 
 export function AdministratorsView() {
   const [statusFilter, setStatusFilter] = useState<'all' | AdminAccountStatus>('all');
@@ -23,71 +42,93 @@ export function AdministratorsView() {
   const [mfaOnly, setMfaOnly] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [admins, setAdmins] = useState<SchoolAdministrator[]>(ADMINISTRATORS);
+
+  const { data, loading, error, reload, setData } = useAsync(
+    async (signal) => {
+      // The invite form needs the school list, so both load together.
+      const [administrators, schools] = await Promise.all([listAdministrators(signal), listTenants(signal)]);
+      return { administrators, schools: schools.map((school) => ({ code: school.code, name: school.name })) };
+    },
+    []
+  );
+
+  const admins = useMemo(() => data?.administrators ?? [], [data]);
+
   const [inviteOpen, setInviteOpen] = useState(false);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [permissionsTarget, setPermissionsTarget] = useState<SchoolAdministrator | null>(null);
   const { notice, notify, dismiss } = useNotice();
 
-  const enforceMfa = () => {
-    setAdmins((prev) =>
-      prev.map((admin) => (selectedIds.includes(admin.id) ? { ...admin, mfaEnabled: true } : admin))
+  const replaceAdmin = (updated: SchoolAdministrator) =>
+    setData((previous) =>
+      previous
+        ? { ...previous, administrators: previous.administrators.map((item) => (item.id === updated.id ? updated : item)) }
+        : previous
     );
-    const count = selectedIds.length;
-    setSelectedIds([]);
-    notify(`MFA enrolment enforced on ${count} account${count === 1 ? '' : 's'}. They must register an authenticator at next sign-in.`);
+
+  const enforceMfa = async () => {
+    try {
+      const message = await enforceMfaRequest(selectedIds);
+      setData((previous) =>
+        previous
+          ? {
+              ...previous,
+              administrators: previous.administrators.map((admin) =>
+                selectedIds.includes(admin.id) ? { ...admin, mfaRequired: true } : admin
+              ),
+            }
+          : previous
+      );
+      setSelectedIds([]);
+      notify(message);
+    } catch (failure) {
+      notify(failureMessage(failure), 'error');
+    }
   };
 
-  const sendResetLinks = () => {
-    const count = selectedIds.length;
-    setSelectedIds([]);
-    notify(`Password reset links sent to ${count} administrator${count === 1 ? '' : 's'}. Each link expires in 60 minutes.`, 'info');
+  const sendResetLinks = async () => {
+    try {
+      const message = await sendPasswordResets(selectedIds);
+      setSelectedIds([]);
+      notify(message, 'info');
+    } catch (failure) {
+      notify(failureMessage(failure), 'error');
+    }
   };
 
-  const toggleAccountStatus = (admin: SchoolAdministrator) => {
+  const toggleAccountStatus = async (admin: SchoolAdministrator) => {
     const unlocking = admin.status === 'locked';
-    setAdmins((prev) =>
-      prev.map((item) =>
-        item.id === admin.id ? { ...item, status: unlocking ? 'active' : 'disabled' } : item
-      )
-    );
-    notify(
-      unlocking
-        ? `${admin.fullName} unlocked and able to sign in again.`
-        : `${admin.fullName} suspended. Their administrator access is revoked.`,
-      unlocking ? 'success' : 'warning'
-    );
+
+    try {
+      const result = await setAdministratorStatus(admin.id, unlocking ? 'active' : 'disabled');
+      replaceAdmin(result.administrator);
+      notify(result.message, unlocking ? 'success' : 'warning');
+    } catch (failure) {
+      notify(failureMessage(failure), 'error');
+    }
   };
 
-  const handleInvite = (draft: InviteDraft) => {
-    const tenant = admins.find((admin) => admin.schoolCode === draft.schoolCode);
+  const handleInvite = async (draft: InviteDraft): Promise<InviteErrors | void> => {
+    try {
+      const result = await inviteAdministrator(draft);
 
-    setAdmins((prev) => [
-      {
-        id: Math.max(0, ...prev.map((admin) => admin.id)) + 1,
-        fullName: draft.fullName,
-        email: draft.email,
-        phone: draft.phone,
-        schoolName: tenant?.schoolName ?? draft.schoolCode,
-        schoolCode: draft.schoolCode,
-        role: draft.role,
-        status: 'invited',
-        mfaEnabled: false,
-        lastLogin: 'Never',
-        lastLoginIp: '—',
-        createdOn: DIRECTORY_SNAPSHOT_DATE,
-      },
-      ...prev,
-    ]);
-
-    setInviteOpen(false);
-    setStatusFilter('all');
-    setRoleFilter(draft.role);
-    notify(
-      `Invitation sent to ${draft.email}. The account stays in an invited state until first sign-in${
-        draft.requireMfa ? ', and MFA enrolment is required at that point' : ''
-      }.`
-    );
+      setData((previous) =>
+        previous ? { ...previous, administrators: [result.administrator, ...previous.administrators] } : previous
+      );
+      setInviteOpen(false);
+      setStatusFilter('all');
+      setRoleFilter(draft.role);
+      notify(result.message);
+    } catch (failure) {
+      if (failure instanceof ApiError && failure.status === 422) {
+        const mapped: InviteErrors = {};
+        Object.entries(failure.errors).forEach(([field, messages]) => {
+          mapped[INVITE_FIELDS[field] ?? 'form'] = messages[0];
+        });
+        return mapped;
+      }
+      return { form: failureMessage(failure) };
+    }
   };
 
   const stats = useMemo(
@@ -127,6 +168,14 @@ export function AdministratorsView() {
       const visibleIds = rows.map((row) => row.id);
       return allVisibleSelected ? prev.filter((id) => !visibleIds.includes(id)) : Array.from(new Set([...prev, ...visibleIds]));
     });
+
+  if (loading) {
+    return <LoadingBlock rows={6} label="Loading administrators" />;
+  }
+
+  if (error) {
+    return <ErrorBlock message={error} onRetry={reload} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -376,6 +425,13 @@ export function AdministratorsView() {
                       <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold uppercase">
                         On
                       </span>
+                    ) : admin.mfaRequired ? (
+                      <span
+                        title="Required at next sign-in; not yet enrolled"
+                        className="inline-block px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-extrabold uppercase"
+                      >
+                        Required
+                      </span>
                     ) : (
                       <span className="inline-block px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-extrabold uppercase">
                         Off
@@ -448,6 +504,7 @@ export function AdministratorsView() {
           onClose={() => setInviteOpen(false)}
           onInvite={handleInvite}
           existingEmails={admins.map((admin) => admin.email.toLowerCase())}
+          tenants={data?.schools ?? []}
         />
       )}
 

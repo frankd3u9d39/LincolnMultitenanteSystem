@@ -8,7 +8,8 @@ import { storageUsagePercent } from '../utils';
 interface StorageQuotaModalProps {
   tenant: SchoolTenant;
   onClose: () => void;
-  onApply: (storageQuotaGb: number) => void;
+  /** Resolves with an error message to show in the dialog, or nothing on success. */
+  onApply: (storageQuotaGb: number) => Promise<string | void>;
 }
 
 const PRESET_QUOTAS = [50, 250, 500, 1000, 2000];
@@ -17,12 +18,13 @@ const PRESET_QUOTAS = [50, 250, 500, 1000, 2000];
 export function StorageQuotaModal({ tenant, onClose, onApply }: StorageQuotaModalProps) {
   const [quota, setQuota] = useState(tenant.storageQuotaGb);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const changed = quota !== tenant.storageQuotaGb;
   const belowUsage = quota < tenant.storageUsedGb;
   const projectedUsage = quota === 0 ? 0 : Math.min(100, (tenant.storageUsedGb / quota) * 100);
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (quota < 1) {
       setError('Allocate at least 1 GB.');
       return;
@@ -31,7 +33,14 @@ export function StorageQuotaModal({ tenant, onClose, onApply }: StorageQuotaModa
       setError(`Below the ${tenant.storageUsedGb.toFixed(1)} GB already stored by this school.`);
       return;
     }
-    onApply(quota);
+    setSaving(true);
+    const rejected = await onApply(quota);
+    setSaving(false);
+
+    if (rejected) {
+      setError(rejected);
+      return;
+    }
     onClose();
   };
 
@@ -44,8 +53,8 @@ export function StorageQuotaModal({ tenant, onClose, onApply }: StorageQuotaModa
       footer={
         <>
           <ModalSecondaryButton onClick={onClose}>Cancel</ModalSecondaryButton>
-          <ModalPrimaryButton onClick={handleApply} disabled={!changed || belowUsage}>
-            Apply Quota
+          <ModalPrimaryButton onClick={handleApply} disabled={!changed || belowUsage || saving}>
+            {saving ? 'Saving…' : 'Apply Quota'}
           </ModalPrimaryButton>
         </>
       }
@@ -128,5 +137,90 @@ export function StorageQuotaModal({ tenant, onClose, onApply }: StorageQuotaModa
         )}
       </div>
     </ModalShell>
+  );
+}
+
+interface SupportAccessModalProps {
+  tenant: SchoolTenant;
+  onClose: () => void;
+  /** Resolves with an error message to show in the dialog, or nothing on success. */
+  onSubmit: (reason: string) => Promise<string | void>;
+}
+
+/** Records a time-boxed support access entry, which needs a stated reason. */
+export function SupportAccessModal({ tenant, onClose, onSubmit }: SupportAccessModalProps) {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (reason.trim().length < 5) {
+      setError('State why you need access, in at least a few words.');
+      return;
+    }
+
+    setSaving(true);
+    const rejected = await onSubmit(reason.trim());
+    setSaving(false);
+
+    if (rejected) {
+      setError(rejected);
+      return;
+    }
+    onClose();
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <ModalShell
+        eyebrow="Tenant Access"
+        title="Log support access"
+        subtitle={`${tenant.name} • ${tenant.code}`}
+        onClose={onClose}
+        widthClass="max-w-md"
+        footer={
+          <>
+            <ModalSecondaryButton onClick={onClose}>Cancel</ModalSecondaryButton>
+            <ModalPrimaryButton type="submit" disabled={saving}>
+              {saving ? 'Recording…' : 'Record Access'}
+            </ModalPrimaryButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3.5 text-[11px] text-amber-900 leading-relaxed">
+            This records a 30-minute support access entry in the audit trail, with your reason. It does not notify the
+            school&apos;s administrators.
+          </div>
+
+          <div>
+            <label
+              htmlFor="support-reason"
+              className="block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5"
+            >
+              Reason for access
+            </label>
+            <textarea
+              id="support-reason"
+              rows={3}
+              value={reason}
+              onChange={(e) => {
+                setReason(e.target.value);
+                setError('');
+              }}
+              placeholder="Investigating a failed results import reported by the registrar"
+              className={`w-full px-3 py-2 text-xs rounded-xl border bg-white text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 transition-all resize-none ${
+                error
+                  ? 'border-red-400 focus:ring-red-500/20 focus:border-red-500'
+                  : 'border-zinc-200 focus:ring-[#B81D22]/20 focus:border-[#B81D22]'
+              }`}
+            />
+            {error && <p className="mt-1 text-[11px] font-semibold text-red-600">{error}</p>}
+          </div>
+        </div>
+      </ModalShell>
+    </form>
   );
 }

@@ -1,5 +1,4 @@
 // GROUP 4: SuperAdmin Module - services
-// This folder contains services strictly isolated to the SuperAdmin domain.
+// API integration for the SuperAdmin screens.
 
-export * from './administrators';
-export * from './tenants';
+export * from './api';

@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-export type NoticeTone = 'success' | 'info' | 'warning';
+export type NoticeTone = 'success' | 'info' | 'warning' | 'error';
 
 export interface Notice {
   tone: NoticeTone;

@@ -1,3 +1,4 @@
 // Service Facade: api
-// Export API methods for api service.
-export {};
+// Shared HTTP client used by every module's services.
+
+export * from './client';

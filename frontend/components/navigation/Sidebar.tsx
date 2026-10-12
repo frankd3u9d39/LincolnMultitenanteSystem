@@ -1,10 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ROLE_NAVIGATION, UserRole } from '@/constants/navigation';
 import { NavIcon } from './NavIcons';
+import { useAuth } from '@/lib/auth';
+import { api } from '@/services/api';
 
 interface SidebarProps {
   role: UserRole;
@@ -30,7 +32,39 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const config = ROLE_NAVIGATION[role] || ROLE_NAVIGATION.admin;
-  const user = DEFAULT_USERS[role];
+  const { user: authUser, signOut } = useAuth();
+  const fallback = DEFAULT_USERS[role];
+  const user = authUser
+    ? {
+        name: authUser.name,
+        email: authUser.email,
+        initials: authUser.name.replace(/^(Dr\.|Prof\.|Mrs\.|Mr\.|Capt\.)\s+/i, '').split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase(),
+      }
+    : fallback;
+
+  // The Schools badge reflects the live tenant count rather than a constant.
+  const [activeSchools, setActiveSchools] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (role !== 'superadmin' || !authUser) {
+      return;
+    }
+
+    let cancelled = false;
+    api<{ data: { tenants: { active: number } } }>('/superadmin/dashboard')
+      .then((result) => {
+        if (!cancelled) {
+          setActiveSchools(result.data.tenants.active);
+        }
+      })
+      .catch(() => {
+        // The badge is decoration; a failed lookup just leaves it hidden.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [role, authUser]);
 
   return (
     <>
@@ -138,7 +172,7 @@ export function Sidebar({
                         )}
 
                         {/* Badges */}
-                        {!isCollapsed && item.badge && (
+                        {!isCollapsed && (item.href === '/superadmin/schools' ? activeSchools !== null : Boolean(item.badge)) && (
                           <span
                             className={`ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm ${
                               isActive
@@ -146,7 +180,7 @@ export function Sidebar({
                                 : 'bg-white/25 text-white'
                             }`}
                           >
-                            {item.badge}
+                            {item.href === '/superadmin/schools' ? `${activeSchools} Active` : item.badge}
                           </span>
                         )}
                       </Link>
@@ -178,6 +212,19 @@ export function Sidebar({
               </div>
             )}
           </div>
+
+          {/* Sign out */}
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            title="Sign out"
+            className={`flex w-full items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-white/90 hover:text-white hover:bg-white/15 transition-colors ${
+              isCollapsed ? 'px-0' : ''
+            }`}
+          >
+            <NavIcon name="logout" className="w-4 h-4 text-white/80" />
+            {!isCollapsed && <span>Sign out</span>}
+          </button>
 
           {/* Desktop Collapse / Expand Toggle Button */}
           {onToggleCollapse && (

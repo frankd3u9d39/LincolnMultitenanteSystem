@@ -1,9 +1,18 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { ApiError } from '@/services/api';
 import { ApiAccessKey } from '../types';
+import {
+  changePassword,
+  confirmMfaEnrolment,
+  createApiKey,
+  startMfaEnrolment,
+} from '../services/api';
+import { useAsync } from '../hooks';
+import { copyToClipboard, downloadCsv } from '../utils';
+import { ErrorBlock, LoadingBlock } from './LoadState';
 import { ModalPrimaryButton, ModalSecondaryButton, ModalShell } from './ModalShell';
-import { copyToClipboard, downloadCsv, randomToken } from '../utils';
 
 const labelClass = 'block text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5';
 const inputBase =
@@ -11,6 +20,14 @@ const inputBase =
 const inputOk = 'border-zinc-200 focus:ring-[#B81D22]/20 focus:border-[#B81D22]';
 const inputBad = 'border-red-400 focus:ring-red-500/20 focus:border-red-500';
 const errorClass = 'mt-1 text-[11px] font-semibold text-red-600';
+
+/** First server message for a field, falling back to the general message. */
+function serverMessage(error: unknown, field?: string): string {
+  if (error instanceof ApiError) {
+    return (field ? error.fieldError(field) : undefined) ?? error.message;
+  }
+  return 'Something went wrong. Please try again.';
+}
 
 /* ------------------------------------------------------------------ */
 /* Password change                                                     */
@@ -23,6 +40,7 @@ interface PasswordStrength {
   bar: string;
 }
 
+/** Live feedback only; the server enforces the platform's actual policy. */
 function scorePassword(value: string): PasswordStrength {
   let score = 0;
   if (value.length >= 10) score += 1;
@@ -39,7 +57,7 @@ function scorePassword(value: string): PasswordStrength {
 
 interface ChangePasswordModalProps {
   onClose: () => void;
-  onChanged: () => void;
+  onChanged: (message: string) => void;
 }
 
 export function ChangePasswordModal({ onClose, onChanged }: ChangePasswordModalProps) {
@@ -47,25 +65,41 @@ export function ChangePasswordModal({ onClose, onChanged }: ChangePasswordModalP
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   const strength = useMemo(() => scorePassword(next), [next]);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const found: Record<string, string> = {};
 
-    if (current.length < 8) found.current = 'Enter your current password.';
-    if (next.length < 10) found.next = 'Platform policy requires at least 10 characters.';
-    else if (strength.score < 3) found.next = 'Add mixed case, a number, or a symbol.';
-    else if (next === current) found.next = 'Choose a password you have not used before.';
+    if (!current) found.current = 'Enter your current password.';
+    if (!next) found.next = 'Enter a new password.';
     if (confirm !== next) found.confirm = 'Passwords do not match.';
 
     setErrors(found);
     if (Object.keys(found).length > 0) return;
 
-    onChanged();
-    onClose();
+    setSaving(true);
+
+    try {
+      onChanged(await changePassword({ current, next, confirmation: confirm }));
+      onClose();
+    } catch (failure) {
+      // The server names which field is wrong; show it there.
+      const failed = failure instanceof ApiError ? failure.errors : {};
+      if (failed.current_password) {
+        setErrors({ current: failed.current_password[0] });
+      } else if (failed.password) {
+        setErrors({ next: failed.password[0] });
+      } else {
+        setErrors({ form: serverMessage(failure) });
+      }
+      setSaving(false);
+    }
   };
+
+  const clear = (key: string) => setErrors((prev) => ({ ...prev, [key]: '', form: '' }));
 
   return (
     <form onSubmit={handleSubmit}>
@@ -77,11 +111,19 @@ export function ChangePasswordModal({ onClose, onChanged }: ChangePasswordModalP
         footer={
           <>
             <ModalSecondaryButton onClick={onClose}>Cancel</ModalSecondaryButton>
-            <ModalPrimaryButton type="submit">Update Password</ModalPrimaryButton>
+            <ModalPrimaryButton type="submit" disabled={saving}>
+              {saving ? 'Updating…' : 'Update Password'}
+            </ModalPrimaryButton>
           </>
         }
       >
         <div className="space-y-4">
+          {errors.form && (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800">
+              {errors.form}
+            </div>
+          )}
+
           <div>
             <label className={labelClass} htmlFor="pw-current">Current Password</label>
             <input
@@ -91,7 +133,7 @@ export function ChangePasswordModal({ onClose, onChanged }: ChangePasswordModalP
               value={current}
               onChange={(e) => {
                 setCurrent(e.target.value);
-                setErrors((prev) => ({ ...prev, current: '' }));
+                clear('current');
               }}
               className={`${inputBase} ${errors.current ? inputBad : inputOk}`}
             />
@@ -107,17 +149,14 @@ export function ChangePasswordModal({ onClose, onChanged }: ChangePasswordModalP
               value={next}
               onChange={(e) => {
                 setNext(e.target.value);
-                setErrors((prev) => ({ ...prev, next: '' }));
+                clear('next');
               }}
               className={`${inputBase} ${errors.next ? inputBad : inputOk}`}
             />
             {next.length > 0 && (
               <div className="mt-2 flex items-center gap-2">
                 <div className="flex-1 h-1.5 rounded-full bg-zinc-100 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${strength.bar}`}
-                    style={{ width: `${(strength.score / 5) * 100}%` }}
-                  />
+                  <div className={`h-full rounded-full transition-all ${strength.bar}`} style={{ width: `${(strength.score / 5) * 100}%` }} />
                 </div>
                 <span className={`text-[11px] font-bold shrink-0 ${strength.tone}`}>{strength.label}</span>
               </div>
@@ -134,99 +173,16 @@ export function ChangePasswordModal({ onClose, onChanged }: ChangePasswordModalP
               value={confirm}
               onChange={(e) => {
                 setConfirm(e.target.value);
-                setErrors((prev) => ({ ...prev, confirm: '' }));
+                clear('confirm');
               }}
               className={`${inputBase} ${errors.confirm ? inputBad : inputOk}`}
             />
             {errors.confirm && <p className={errorClass}>{errors.confirm}</p>}
           </div>
 
-          <ul className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3.5 space-y-1 text-[11px] text-zinc-600">
-            <li>At least 10 characters, as set in Platform Settings.</li>
-            <li>Mixed case plus a number or symbol.</li>
-            <li>Expires after 90 days.</li>
-          </ul>
-        </div>
-      </ModalShell>
-    </form>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* MFA re-enrolment                                                    */
-/* ------------------------------------------------------------------ */
-
-interface MfaEnrolmentModalProps {
-  onClose: () => void;
-  onEnrolled: () => void;
-}
-
-export function MfaEnrolmentModal({ onClose, onEnrolled }: MfaEnrolmentModalProps) {
-  const [code, setCode] = useState('');
-  const [error, setError] = useState('');
-  const secret = useMemo(() => randomToken(16).toUpperCase().match(/.{1,4}/g)?.join(' ') ?? '', []);
-
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!/^\d{6}$/.test(code.trim())) {
-      setError('Enter the 6-digit code shown in your authenticator app.');
-      return;
-    }
-    onEnrolled();
-    onClose();
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <ModalShell
-        eyebrow="Sign-in Security"
-        title="Re-enrol Authenticator"
-        subtitle="Replaces your existing factor once a valid code is confirmed."
-        onClose={onClose}
-        footer={
-          <>
-            <ModalSecondaryButton onClick={onClose}>Cancel</ModalSecondaryButton>
-            <ModalPrimaryButton type="submit">Confirm &amp; Replace</ModalPrimaryButton>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <ol className="space-y-2 text-[11px] text-zinc-600 list-decimal list-inside">
-            <li>Remove the old &quot;Lincoln Platform&quot; entry from your authenticator app.</li>
-            <li>Add a new entry using the setup key below.</li>
-            <li>Enter the 6-digit code it generates to confirm.</li>
-          </ol>
-
-          <div>
-            <span className={labelClass}>Setup Key</span>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 px-3 py-2 rounded-xl border border-zinc-200 bg-zinc-50 text-xs font-mono tracking-wider text-zinc-800 break-all">
-                {secret}
-              </code>
-              <ModalSecondaryButton onClick={() => copyToClipboard(secret.replace(/\s/g, ''))}>
-                Copy
-              </ModalSecondaryButton>
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClass} htmlFor="mfa-code">Verification Code</label>
-            <input
-              id="mfa-code"
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              autoComplete="one-time-code"
-              value={code}
-              onChange={(e) => {
-                setCode(e.target.value.replace(/\D/g, ''));
-                setError('');
-              }}
-              placeholder="000000"
-              className={`${inputBase} ${error ? inputBad : inputOk} font-mono tracking-[0.3em] text-center`}
-            />
-            {error && <p className={errorClass}>{error}</p>}
-          </div>
+          <p className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3.5 text-[11px] text-zinc-600">
+            The minimum length, numbers and symbols required are set in Platform Settings and checked when you save.
+          </p>
         </div>
       </ModalShell>
     </form>
@@ -238,21 +194,18 @@ export function MfaEnrolmentModal({ onClose, onEnrolled }: MfaEnrolmentModalProp
 /* ------------------------------------------------------------------ */
 
 interface RecoveryCodesModalProps {
+  codes: string[];
   onClose: () => void;
   onNotify: (message: string) => void;
 }
 
-export function RecoveryCodesModal({ onClose, onNotify }: RecoveryCodesModalProps) {
-  const codes = useMemo(
-    () => Array.from({ length: 8 }, () => `${randomToken(5)}-${randomToken(5)}`.toUpperCase()),
-    []
-  );
-
+/** Shows codes the server has just generated. They cannot be retrieved again. */
+export function RecoveryCodesModal({ codes, onClose, onNotify }: RecoveryCodesModalProps) {
   return (
     <ModalShell
       eyebrow="Sign-in Security"
-      title="New Recovery Codes"
-      subtitle="Your previous codes are now invalid. Each code below works once."
+      title="Recovery Codes"
+      subtitle="Each code works once. Any earlier set no longer works."
       onClose={onClose}
       footer={
         <>
@@ -280,7 +233,7 @@ export function RecoveryCodesModal({ onClose, onNotify }: RecoveryCodesModalProp
         <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3.5">
           <p className="font-bold text-amber-900 text-[11px] uppercase tracking-wider">Shown once</p>
           <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
-            These codes are not recoverable after you close this dialog. Copy or download them now.
+            These codes are stored hashed, so they are not recoverable after you close this dialog. Copy or download them now.
           </p>
         </div>
 
@@ -300,60 +253,167 @@ export function RecoveryCodesModal({ onClose, onNotify }: RecoveryCodesModalProp
 }
 
 /* ------------------------------------------------------------------ */
+/* MFA enrolment                                                       */
+/* ------------------------------------------------------------------ */
+
+interface MfaEnrolmentModalProps {
+  onClose: () => void;
+  /** Called once a real authenticator code has been verified. */
+  onEnrolled: (message: string) => void;
+  onNotify: (message: string) => void;
+}
+
+export function MfaEnrolmentModal({ onClose, onEnrolled, onNotify }: MfaEnrolmentModalProps) {
+  const setup = useAsync(() => startMfaEnrolment(), []);
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+
+  // Once verified the new recovery codes replace the setup step.
+  if (recoveryCodes) {
+    return <RecoveryCodesModal codes={recoveryCodes} onClose={onClose} onNotify={onNotify} />;
+  }
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!/^\d{6}$/.test(code.trim())) {
+      setError('Enter the 6-digit code shown in your authenticator app.');
+      return;
+    }
+
+    setVerifying(true);
+
+    try {
+      const result = await confirmMfaEnrolment(code.trim());
+      onEnrolled(result.message);
+      setRecoveryCodes(result.recoveryCodes);
+    } catch (failure) {
+      setError(serverMessage(failure, 'code'));
+      setVerifying(false);
+    }
+  };
+
+  const secret = setup.data?.secret ?? '';
+  const spaced = secret.match(/.{1,4}/g)?.join(' ') ?? '';
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <ModalShell
+        eyebrow="Sign-in Security"
+        title="Re-enrol Authenticator"
+        subtitle="Your current authenticator keeps working until a new code is confirmed."
+        onClose={onClose}
+        footer={
+          <>
+            <ModalSecondaryButton onClick={onClose}>Cancel</ModalSecondaryButton>
+            <ModalPrimaryButton type="submit" disabled={!setup.data || verifying}>
+              {verifying ? 'Verifying…' : 'Confirm & Replace'}
+            </ModalPrimaryButton>
+          </>
+        }
+      >
+        {setup.loading ? (
+          <LoadingBlock rows={3} label="Preparing setup key" />
+        ) : setup.error || !setup.data ? (
+          <ErrorBlock message={setup.error ?? 'The setup key could not be created.'} onRetry={setup.reload} />
+        ) : (
+          <div className="space-y-4">
+            <ol className="space-y-2 text-[11px] text-zinc-600 list-decimal list-inside">
+              <li>Add a new entry to your authenticator app using the setup key below.</li>
+              <li>Enter the 6-digit code it generates to confirm.</li>
+              <li>Remove the old entry once the new one works.</li>
+            </ol>
+
+            <div>
+              <span className={labelClass}>Setup Key</span>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 px-3 py-2 rounded-xl border border-zinc-200 bg-zinc-50 text-xs font-mono tracking-wider text-zinc-800 break-all">
+                  {spaced}
+                </code>
+                <ModalSecondaryButton onClick={() => copyToClipboard(secret)}>Copy</ModalSecondaryButton>
+              </div>
+              <p className="mt-1.5 text-[11px] text-zinc-400 break-all">
+                Or open this link on your phone:{' '}
+                <a href={setup.data.uri} className="text-[#B81D22] hover:underline">
+                  otpauth link
+                </a>
+              </p>
+            </div>
+
+            <div>
+              <label className={labelClass} htmlFor="mfa-code">Verification Code</label>
+              <input
+                id="mfa-code"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                autoComplete="one-time-code"
+                value={code}
+                onChange={(e) => {
+                  setCode(e.target.value.replace(/\D/g, ''));
+                  setError('');
+                }}
+                placeholder="000000"
+                className={`${inputBase} ${error ? inputBad : inputOk} font-mono tracking-[0.3em] text-center`}
+              />
+              {error && <p className={errorClass}>{error}</p>}
+            </div>
+          </div>
+        )}
+      </ModalShell>
+    </form>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* API key creation                                                    */
 /* ------------------------------------------------------------------ */
 
 interface CreateApiKeyModalProps {
   onClose: () => void;
-  onCreate: (key: ApiAccessKey, secret: string) => void;
-  existingLabels: string[];
+  /** Called with the refreshed key list as soon as the key exists. */
+  onCreated: (keys: ApiAccessKey[], message: string) => void;
 }
 
-export function CreateApiKeyModal({ onClose, onCreate, existingLabels }: CreateApiKeyModalProps) {
+export function CreateApiKeyModal({ onClose, onCreated }: CreateApiKeyModalProps) {
   const [label, setLabel] = useState('');
   const [scope, setScope] = useState<ApiAccessKey['scope']>('read_only');
   const [error, setError] = useState('');
-  const [issued, setIssued] = useState<{ key: ApiAccessKey; secret: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [secret, setSecret] = useState<string | null>(null);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    const trimmed = label.trim();
 
-    if (trimmed.length < 4) {
+    if (label.trim().length < 4) {
       setError('Give the key a recognisable label, e.g. "Attendance Sync".');
       return;
     }
-    if (existingLabels.map((item) => item.toLowerCase()).includes(trimmed.toLowerCase())) {
-      setError('A key with this label already exists.');
-      return;
+
+    setSaving(true);
+
+    try {
+      const result = await createApiKey({ label: label.trim(), scope });
+      onCreated(result.keys, result.message);
+      setSecret(result.secret);
+    } catch (failure) {
+      setError(serverMessage(failure, 'label'));
+      setSaving(false);
     }
-
-    const prefix = `lmp_live_${randomToken(4)}`;
-    const secret = `${prefix}${randomToken(28)}`;
-    const key: ApiAccessKey = {
-      id: Date.now(),
-      label: trimmed,
-      prefix,
-      scope,
-      createdOn: '2026-10-04',
-      lastUsed: 'Never',
-      status: 'active',
-    };
-
-    setIssued({ key, secret });
-    onCreate(key, secret);
   };
 
-  if (issued) {
+  if (secret) {
     return (
       <ModalShell
         eyebrow="API Access"
         title="Key Created"
-        subtitle={`${issued.key.label} • shown once, never again`}
+        subtitle={`${label.trim()} • shown once, never again`}
         onClose={onClose}
         footer={
           <>
-            <ModalSecondaryButton onClick={() => copyToClipboard(issued.secret)}>Copy Secret</ModalSecondaryButton>
+            <ModalSecondaryButton onClick={() => copyToClipboard(secret)}>Copy Secret</ModalSecondaryButton>
             <ModalPrimaryButton onClick={onClose}>Done</ModalPrimaryButton>
           </>
         }
@@ -362,12 +422,12 @@ export function CreateApiKeyModal({ onClose, onCreate, existingLabels }: CreateA
           <div className="rounded-xl border border-red-200 bg-red-50/60 p-3.5">
             <p className="font-bold text-red-900 text-[11px] uppercase tracking-wider">Copy it now</p>
             <p className="text-[11px] text-red-800 mt-1 leading-relaxed">
-              This is the only time the full secret is displayed. Only the prefix is stored and shown afterwards.
+              This is the only time the full secret is displayed. Only a hash is stored, so it cannot be shown again.
             </p>
           </div>
 
           <code className="block px-3 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs font-mono text-zinc-800 break-all">
-            {issued.secret}
+            {secret}
           </code>
         </div>
       </ModalShell>
@@ -384,7 +444,9 @@ export function CreateApiKeyModal({ onClose, onCreate, existingLabels }: CreateA
         footer={
           <>
             <ModalSecondaryButton onClick={onClose}>Cancel</ModalSecondaryButton>
-            <ModalPrimaryButton type="submit">Generate Key</ModalPrimaryButton>
+            <ModalPrimaryButton type="submit" disabled={saving}>
+              {saving ? 'Generating…' : 'Generate Key'}
+            </ModalPrimaryButton>
           </>
         }
       >
@@ -410,7 +472,7 @@ export function CreateApiKeyModal({ onClose, onCreate, existingLabels }: CreateA
             <div className="space-y-2.5">
               {(
                 [
-                  { value: 'read_only', title: 'Read only', hint: 'Fetch tenants, users, and reports. No writes.' },
+                  { value: 'read_only', title: 'Read only', hint: 'Fetch tenants, users, and reports. Any change is refused.' },
                   { value: 'read_write', title: 'Read / write', hint: 'Create and update records across tenants.' },
                   { value: 'admin', title: 'Full admin', hint: 'Everything, including provisioning and suspension.' },
                 ] as const

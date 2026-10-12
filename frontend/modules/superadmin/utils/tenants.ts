@@ -17,6 +17,7 @@ export const TENANT_STATUS_STYLES: Record<TenantStatus, string> = {
   active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   suspended: 'bg-red-50 text-red-700 border-red-200',
   pending: 'bg-blue-50 text-blue-700 border-blue-200',
+  inactive: 'bg-zinc-100 text-zinc-600 border-zinc-200',
 };
 
 /** Storage consumption as a percentage of the tenant's quota, capped at 100. */

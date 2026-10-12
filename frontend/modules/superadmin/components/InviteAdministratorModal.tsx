@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { SchoolAdministrator } from '../types';
-import { TENANT_OPTIONS } from '../services';
 import { ADMIN_ROLE_LABELS } from '../utils';
 
 export interface InviteDraft {
@@ -25,21 +24,28 @@ const EMPTY_DRAFT: InviteDraft = {
   message: '',
 };
 
-type FieldErrors = Partial<Record<'fullName' | 'email' | 'phone' | 'schoolCode', string>>;
+export type InviteErrors = Partial<Record<'fullName' | 'email' | 'phone' | 'schoolCode' | 'form', string>>;
+
+type FieldErrors = InviteErrors;
 
 interface InviteAdministratorModalProps {
   onClose: () => void;
-  onInvite: (draft: InviteDraft) => void;
+  /** Resolves with field errors from the server when it rejects the invitation, or nothing on success. */
+  onInvite: (draft: InviteDraft) => Promise<InviteErrors | void>;
   existingEmails: string[];
+  /** Schools an administrator can be invited into. */
+  tenants: Array<{ code: string; name: string }>;
 }
 
 export function InviteAdministratorModal({
   onClose,
   onInvite,
   existingEmails,
+  tenants,
 }: InviteAdministratorModalProps) {
   const [draft, setDraft] = useState<InviteDraft>(EMPTY_DRAFT);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [submitting, setSubmitting] = useState(false);
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -72,19 +78,25 @@ export function InviteAdministratorModal({
     return next;
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const found = validate();
     setErrors(found);
     if (Object.keys(found).length > 0) return;
 
-    onInvite({
+    setSubmitting(true);
+    const rejected = await onInvite({
       ...draft,
       fullName: draft.fullName.trim(),
       email: draft.email.trim().toLowerCase(),
       phone: draft.phone.trim(),
       message: draft.message.trim(),
     });
+    setSubmitting(false);
+
+    if (rejected) {
+      setErrors(rejected);
+    }
   };
 
   const inputClass = (field: keyof FieldErrors) =>
@@ -132,6 +144,11 @@ export function InviteAdministratorModal({
           </div>
 
           <div className="p-5 space-y-4">
+            {errors.form && (
+              <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800">
+                {errors.form}
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={labelClass} htmlFor="invite-name">Full Name</label>
@@ -203,7 +220,7 @@ export function InviteAdministratorModal({
                 className={inputClass('schoolCode')}
               >
                 <option value="">Select the school this account administers…</option>
-                {TENANT_OPTIONS.map((tenant) => (
+                {tenants.map((tenant) => (
                   <option key={tenant.code} value={tenant.code}>
                     {tenant.name} ({tenant.code})
                   </option>
@@ -252,9 +269,10 @@ export function InviteAdministratorModal({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10"
+              disabled={submitting}
+              className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Send Invitation
+              {submitting ? 'Sending…' : 'Send Invitation'}
             </button>
           </div>
         </form>

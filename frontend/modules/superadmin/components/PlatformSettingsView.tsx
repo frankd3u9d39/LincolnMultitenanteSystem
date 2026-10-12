@@ -1,7 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import { ApiError } from '@/services/api';
 import { FullPlatformSettings, TenantResourceLimits } from '../types';
+import { getPlatformSettings, runBackup, savePlatformSettings, sendTestEmail } from '../services/api';
+import { useAsync, useNotice } from '../hooks';
+import { ErrorBlock, LoadingBlock } from './LoadState';
+import { NoticeBanner } from './NoticeBanner';
 
 type SettingsTab = 'general' | 'tenants' | 'security' | 'mail' | 'storage';
 
@@ -11,72 +16,44 @@ interface SettingsTabDef {
   icon: string;
 }
 
-const INITIAL_SETTINGS: FullPlatformSettings = {
-  general: {
-    platformName: 'Lincoln Multi-Tenant Academic Platform',
-    tagline: 'Enterprise Multi-School Governance & Management System',
-    supportEmail: 'platform-support@lincoln.edu',
-    supportPhone: '+234 (0) 800-LINCOLN-SYS',
-    helpdeskUrl: 'https://support.lincolnplatform.io',
-    defaultTimezone: 'Africa/Lagos (GMT+1)',
-    defaultCurrency: 'NGN (₦)',
-    maintenanceMode: false,
-    maintenanceMessage:
-      'The Lincoln Academic Platform is currently undergoing scheduled infrastructure upgrades. All campus portals will be available shortly.',
-    allowedBypassIps: '192.168.1.100, 10.0.0.1, 197.210.54.12',
-  },
-  tenants: {
-    onboardingMode: 'approval_required',
-    allowSubdomainCustomization: true,
-    requireDomainVerification: true,
-    autoSuspendInactiveDays: 180,
-  },
-  resourceLimits: {
-    maxStudents: 10000,
-    maxTeachers: 800,
-    storageQuotaGb: 250,
-    maxFileUploadMb: 50,
-  },  security: {
-    enforceAdminMfa: true,
-    minPasswordLength: 10,
-    requireSpecialChars: true,
-    requireNumbers: true,
-    passwordExpiryDays: 90,
-    sessionTimeoutMinutes: 30,
-    maxFailedLogins: 5,
-    lockoutDurationMinutes: 15,
-    ipWhitelistEnabled: false,
-    allowedSuperAdminIps: '192.168.1.100, 10.0.0.45',
-  },
-  mail: {
-    mailDriver: 'smtp',
-    smtpHost: 'smtp.mailgun.org',
-    smtpPort: 587,
-    smtpEncryption: 'tls',
-    smtpUsername: 'postmaster@mg.lincolnplatform.io',
-    senderName: 'Lincoln Multi-Tenant Platform',
-    senderEmail: 'notifications@lincolnplatform.io',
-  },
-  storage: {
-    storageDriver: 's3',
-    bucketName: 'lincoln-multitenant-production-assets',
-    region: 'af-south-1',
-    cdnDomain: 'https://cdn.lincolnplatform.io',
-    autoBackupSchedule: 'daily',
-    backupRetentionDays: 90,
-    backupEncryptionEnabled: true,
-    lastBackupTimestamp: '2026-09-29 02:00:15 UTC (Success - 4.2 GB)',
-  },
-};
-
+/** Loads the saved configuration, then hands it to the editable form. */
 export function PlatformSettingsView() {
+  const { data, loading, error, reload } = useAsync((signal) => getPlatformSettings(signal), []);
+
+  if (loading) {
+    return <LoadingBlock rows={6} label="Loading platform settings" />;
+  }
+
+  if (error || !data) {
+    return <ErrorBlock message={error ?? 'The settings could not be loaded.'} onRetry={reload} />;
+  }
+
+  return <PlatformSettingsForm initial={data.settings} initialSmtpPasswordSet={data.smtpPasswordSet} />;
+}
+
+const failureMessage = (error: unknown) =>
+  error instanceof ApiError ? error.message : 'Something went wrong. Please try again.';
+
+function PlatformSettingsForm({
+  initial,
+  initialSmtpPasswordSet,
+}: {
+  initial: FullPlatformSettings;
+  initialSmtpPasswordSet: boolean;
+}) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
-  const [settings, setSettings] = useState<FullPlatformSettings>(INITIAL_SETTINGS);
-  const [isSavedAlert, setIsSavedAlert] = useState(false);
+  const [settings, setSettings] = useState<FullPlatformSettings>(initial);
+  // What is persisted on the server; unsaved edits are measured against it.
+  const [saved, setSaved] = useState<FullPlatformSettings>(initial);
+  const [smtpPasswordSet, setSmtpPasswordSet] = useState(initialSmtpPasswordSet);
+  const [saving, setSaving] = useState(false);
   const [testEmailSending, setTestEmailSending] = useState(false);
-  const [testEmailResult, setTestEmailResult] = useState<string | null>(null);
+  const [testEmailResult, setTestEmailResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [backupTriggering, setBackupTriggering] = useState(false);
-  const [backupSuccessMsg, setBackupSuccessMsg] = useState<string | null>(null);
+  const [backupResult, setBackupResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const { notice, notify, dismiss } = useNotice();
+
+  const dirty = JSON.stringify(settings) !== JSON.stringify(saved);
 
 
   const handleGeneralChange = <K extends keyof FullPlatformSettings['general']>(
@@ -138,34 +115,59 @@ export function PlatformSettingsView() {
       resourceLimits: { ...prev.resourceLimits, [key]: value },
     }));
   };
-  const handleSaveAll = (e: React.FormEvent) => {
+  const handleSaveAll = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSavedAlert(true);
-    setTimeout(() => setIsSavedAlert(false), 4000);
+    setSaving(true);
+
+    try {
+      const message = await savePlatformSettings(settings, saved);
+      const hadPassword = settings.mail.smtpPassword !== '';
+
+      // The password is write-only: once saved the box is cleared and only "set" is remembered.
+      const persisted = { ...settings, mail: { ...settings.mail, smtpPassword: '' } };
+      setSettings(persisted);
+      setSaved(persisted);
+      setSmtpPasswordSet((previous) => previous || hadPassword);
+      notify(message);
+    } catch (failure) {
+      if (failure instanceof ApiError && failure.status === 422) {
+        const detail = Object.values(failure.errors)[0]?.[0];
+        notify(detail ?? failure.message, 'error');
+      } else {
+        notify(failureMessage(failure), 'error');
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSendTestEmail = () => {
+  const handleSendTestEmail = async () => {
     setTestEmailSending(true);
     setTestEmailResult(null);
-    setTimeout(() => {
+
+    try {
+      setTestEmailResult({ ok: true, message: await sendTestEmail() });
+    } catch (failure) {
+      setTestEmailResult({ ok: false, message: failureMessage(failure) });
+    } finally {
       setTestEmailSending(false);
-      setTestEmailResult(
-        `Test dispatch dispatched successfully to SuperAdmin mailbox via ${settings.mail.smtpHost}:${settings.mail.smtpPort}!`
-      );
-      setTimeout(() => setTestEmailResult(null), 5000);
-    }, 1500);
+    }
   };
 
-  const handleTriggerBackup = () => {
+  const handleTriggerBackup = async () => {
     setBackupTriggering(true);
-    setBackupSuccessMsg(null);
-    setTimeout(() => {
+    setBackupResult(null);
+
+    try {
+      const result = await runBackup();
+      setBackupResult({ ok: true, message: result.message });
+      setSettings((previous) => ({ ...previous, storage: { ...previous.storage, lastBackupTimestamp: result.lastBackup } }));
+      setSaved((previous) => ({ ...previous, storage: { ...previous.storage, lastBackupTimestamp: result.lastBackup } }));
+    } catch (failure) {
+      setBackupResult({ ok: false, message: failureMessage(failure) });
+    } finally {
       setBackupTriggering(false);
-      setBackupSuccessMsg(
-        'Immediate cross-tenant snapshot initiated! Snapshot ID: #SNAP-20260929-01 (Estimated completion: 3 mins)'
-      );
-      setTimeout(() => setBackupSuccessMsg(null), 6000);
-    }, 1800);
+    }
   };
 
   return (
@@ -189,44 +191,27 @@ export function PlatformSettingsView() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => setSettings(INITIAL_SETTINGS)}
-            className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm"
+            onClick={() => setSettings(saved)}
+            disabled={!dirty || saving}
+            className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Reset to Defaults
+            Discard Changes
           </button>
           <button
             type="button"
             onClick={handleSaveAll}
-            className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 flex items-center gap-2"
+            disabled={!dirty || saving}
+            className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
             </svg>
-            <span>Save Configuration</span>
+            <span>{saving ? 'Saving…' : 'Save Configuration'}</span>
           </button>
         </div>
       </div>
 
-      {/* Floating Save Alert */}
-      {isSavedAlert && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm flex items-center justify-between shadow-sm animate-fade-in">
-          <div className="flex items-center gap-2.5">
-            <svg className="w-5 h-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="font-semibold">
-              Global Platform settings successfully saved and propagated across all school instances!
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsSavedAlert(false)}
-            className="text-emerald-700 hover:text-emerald-900 font-bold ml-4"
-          >
-            &times;
-          </button>
-        </div>
-      )}
+      <NoticeBanner notice={notice} onDismiss={dismiss} />
 
       {/* Maintenance Mode Banner Alert if enabled */}
       {settings.general.maintenanceMode && (
@@ -801,6 +786,24 @@ export function PlatformSettingsView() {
               </div>
 
               <div>
+                <label className="block text-xs font-semibold text-zinc-700 mb-1" htmlFor="smtp-password">
+                  SMTP Password
+                </label>
+                <input
+                  id="smtp-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={settings.mail.smtpPassword ?? ''}
+                  onChange={(e) => handleMailChange('smtpPassword', e.target.value)}
+                  placeholder={smtpPasswordSet ? '•••••••• (saved — type to replace)' : 'Not set'}
+                  className="w-full px-3.5 py-2 rounded-xl border border-zinc-300 text-xs sm:text-sm text-zinc-900 font-mono"
+                />
+                <p className="mt-1 text-[11px] text-zinc-400">
+                  Stored encrypted and never shown again. Leave blank to keep the current one.
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-zinc-700 mb-1">
                   Sender From Address
                 </label>
@@ -822,8 +825,15 @@ export function PlatformSettingsView() {
             </p>
 
             {testEmailResult && (
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs">
-                {testEmailResult}
+              <div
+                role="status"
+                className={`p-3 rounded-xl border text-xs ${
+                  testEmailResult.ok
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-red-50 border-red-200 text-red-800'
+                }`}
+              >
+                {testEmailResult.message}
               </div>
             )}
 
@@ -959,9 +969,16 @@ export function PlatformSettingsView() {
               <div className="font-mono text-[11px] text-zinc-500">{settings.storage.lastBackupTimestamp}</div>
             </div>
 
-            {backupSuccessMsg && (
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
-                {backupSuccessMsg}
+            {backupResult && (
+              <div
+                role="status"
+                className={`p-3 rounded-xl border text-xs font-medium ${
+                  backupResult.ok
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-red-50 border-red-200 text-red-800'
+                }`}
+              >
+                {backupResult.message}
               </div>
             )}
 
