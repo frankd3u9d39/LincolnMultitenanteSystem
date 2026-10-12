@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnforceMaintenanceMode;
+use App\Http\Middleware\EnsureStudent;
 use App\Http\Middleware\EnsureSuperAdmin;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Group 4: gates every /api/v1/superadmin route behind the superadmin role.
         $middleware->alias([
             'superadmin' => EnsureSuperAdmin::class,
+            'student' => EnsureStudent::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
