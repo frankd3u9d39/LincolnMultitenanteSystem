@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnforceMaintenanceMode;
+use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureStudent;
 use App\Http\Middleware\EnsureSuperAdmin;
 use Illuminate\Foundation\Application;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'superadmin' => EnsureSuperAdmin::class,
             'student' => EnsureStudent::class,
+            'admin' => EnsureAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
