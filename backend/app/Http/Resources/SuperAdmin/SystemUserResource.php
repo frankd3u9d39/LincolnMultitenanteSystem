@@ -23,10 +23,24 @@ class SystemUserResource extends JsonResource
             'role' => $this->role,
             'schoolName' => $this->school?->name ?? 'Platform Operations',
             'schoolCode' => $this->school?->code ?? 'PLATFORM',
-            'status' => $this->status,
+            'status' => self::displayStatus($this->resource),
             'mfaEnabled' => (bool) $this->mfa_enabled,
             'lastSeen' => $this->last_login_at?->diffForHumans() ?? 'Never signed in',
             'joinedOn' => $this->created_at?->toDateString(),
         ];
+    }
+
+    /** Directory vocabulary: active, inactive or locked. */
+    public static function displayStatus(User $user): string
+    {
+        if ($user->locked_until && $user->locked_until->isFuture()) {
+            return 'locked';
+        }
+
+        return match ($user->status) {
+            User::STATUS_SUSPENDED => 'locked',
+            User::STATUS_INACTIVE, User::STATUS_PENDING => 'inactive',
+            default => 'active',
+        };
     }
 }

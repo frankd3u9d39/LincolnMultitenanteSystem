@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\SuperAdmin\AccountController;
 use App\Http\Controllers\SuperAdmin\AdministratorController;
 use App\Http\Controllers\SuperAdmin\AuditLogController;
 use App\Http\Controllers\SuperAdmin\DashboardController;
@@ -66,4 +67,21 @@ Route::prefix('superadmin')
         // Platform configuration
         Route::get('/platform-settings', [PlatformSettingController::class, 'index'])->name('settings.index');
         Route::put('/platform-settings', [PlatformSettingController::class, 'update'])->name('settings.update');
+        Route::post('/platform-settings/test-email', [PlatformSettingController::class, 'testEmail'])->name('settings.test-email');
+        Route::post('/platform-settings/backup', [PlatformSettingController::class, 'backup'])->name('settings.backup');
+
+        // The signed-in operator's own account
+        Route::prefix('account')->name('account.')->group(function () {
+            Route::get('/', [AccountController::class, 'show'])->name('show');
+            Route::put('/', [AccountController::class, 'update'])->name('update');
+            Route::put('/password', [AccountController::class, 'changePassword'])->name('password');
+            Route::get('/sessions', [AccountController::class, 'sessions'])->name('sessions');
+            Route::delete('/sessions/others', [AccountController::class, 'revokeOtherSessions'])->name('sessions.revoke-others');
+            Route::get('/api-keys', [AccountController::class, 'apiKeys'])->name('api-keys.index');
+            Route::post('/api-keys', [AccountController::class, 'createApiKey'])->name('api-keys.store');
+            Route::delete('/api-keys/{keyId}', [AccountController::class, 'revokeApiKey'])->whereNumber('keyId')->name('api-keys.revoke');
+            Route::post('/mfa/setup', [AccountController::class, 'startMfaEnrolment'])->name('mfa.setup');
+            Route::post('/mfa/confirm', [AccountController::class, 'confirmMfaEnrolment'])->name('mfa.confirm');
+            Route::post('/recovery-codes', [AccountController::class, 'regenerateRecoveryCodes'])->name('recovery-codes');
+        });
     });

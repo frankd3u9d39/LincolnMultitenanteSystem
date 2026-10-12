@@ -69,7 +69,8 @@ class AdministratorController extends Controller
             'name' => $data['full_name'],
             'email' => $data['email'],
             'password' => Hash::make(Str::password(16)),
-            'role' => $data['role'],
+            'role' => User::ROLE_ADMIN,
+            'admin_role' => $data['role'],
             'phone' => $data['phone'],
             'status' => User::STATUS_PENDING,
             'mfa_enabled' => false,
@@ -90,7 +91,7 @@ class AdministratorController extends Controller
             ),
             subject: $administrator,
             newValues: [
-                'role' => $administrator->role,
+                'role' => $administrator->admin_role,
                 'school_code' => $school->code,
                 'require_mfa' => $requireMfa,
             ],
@@ -126,7 +127,9 @@ class AdministratorController extends Controller
         $previous = $administrator->status;
         $administrator->update([
             'status' => $validated['status'],
+            // Restoring an account also clears any temporary sign-in lockout.
             'failed_login_attempts' => $validated['status'] === User::STATUS_ACTIVE ? 0 : $administrator->failed_login_attempts,
+            'locked_until' => $validated['status'] === User::STATUS_ACTIVE ? null : $administrator->locked_until,
         ]);
 
         $restoring = $validated['status'] === User::STATUS_ACTIVE;
@@ -167,14 +170,16 @@ class AdministratorController extends Controller
             ->get();
 
         foreach ($administrators as $administrator) {
-            $administrator->update(['mfa_enabled' => true, 'mfa_enrolled_at' => null]);
+            // Required, not enrolled: coverage only counts accounts that have
+            // actually registered an authenticator.
+            $administrator->update(['mfa_required' => true]);
 
             $this->audit->recordUserChange(
                 eventType: 'user.mfa_enforced',
                 action: 'Enforced MFA Enrolment',
                 description: sprintf('MFA enrolment enforced on %s.', $administrator->email),
                 subject: $administrator,
-                newValues: ['mfa_enabled' => true],
+                newValues: ['mfa_required' => true],
             );
         }
 

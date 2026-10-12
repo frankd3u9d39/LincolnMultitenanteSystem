@@ -58,15 +58,22 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'admin_role',
         'phone',
         'avatar_url',
+        'preferences',
         'status',
         'last_login_at',
         'last_login_ip',
         'mfa_enabled',
+        'mfa_required',
         'mfa_enrolled_at',
         'invited_at',
         'failed_login_attempts',
+        'locked_until',
+        'mfa_secret',
+        'mfa_recovery_codes',
+        'password_changed_at',
     ];
 
     /**
@@ -77,6 +84,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'mfa_secret',
+        'mfa_recovery_codes',
     ];
 
     /**
@@ -90,9 +99,15 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'mfa_enabled' => 'boolean',
+            'mfa_required' => 'boolean',
             'mfa_enrolled_at' => 'datetime',
             'invited_at' => 'datetime',
             'failed_login_attempts' => 'integer',
+            'locked_until' => 'datetime',
+            'password_changed_at' => 'datetime',
+            'preferences' => 'array',
+            'mfa_secret' => 'encrypted',
+            'mfa_recovery_codes' => 'array',
             'password' => 'hashed',
         ];
     }

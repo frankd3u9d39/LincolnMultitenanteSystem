@@ -9,6 +9,9 @@ use Illuminate\Validation\Rule;
 /** GROUP 4: SuperAdmin Module - administrator invitation validation. */
 class InviteAdministratorRequest extends FormRequest
 {
+    /** Titles an administrator can hold within a school. */
+    public const ADMIN_ROLES = ['principal_admin', 'deputy_admin', 'bursar', 'registrar'];
+
     public function authorize(): bool
     {
         return $this->user()?->role === User::ROLE_SUPERADMIN;
@@ -22,7 +25,7 @@ class InviteAdministratorRequest extends FormRequest
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
             'phone' => ['required', 'string', 'min:7', 'max:50'],
             'school_code' => ['required', 'string', Rule::exists('schools', 'code')],
-            'role' => ['required', Rule::in([User::ROLE_ADMIN, User::ROLE_TEACHER])],
+            'role' => ['required', Rule::in(self::ADMIN_ROLES)],
             'require_mfa' => ['sometimes', 'boolean'],
             'message' => ['nullable', 'string', 'max:1000'],
         ];

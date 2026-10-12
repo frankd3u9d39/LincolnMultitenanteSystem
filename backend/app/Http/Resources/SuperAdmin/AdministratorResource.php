@@ -9,7 +9,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * GROUP 4: SuperAdmin Module - school administrator payload.
  *
- * Keys mirror the SchoolAdministrator interface used by the directory table.
+ * Status uses the directory's vocabulary: invited, active, locked, disabled.
+ * An account is "locked" when it is suspended or temporarily locked out after
+ * too many failed sign-ins.
  *
  * @mixin User
  */
@@ -22,16 +24,31 @@ class AdministratorResource extends JsonResource
             'id' => $this->id,
             'fullName' => $this->name,
             'email' => $this->email,
-            'phone' => $this->phone,
+            'phone' => $this->phone ?? '',
             'schoolName' => $this->school?->name,
             'schoolCode' => $this->school?->code,
-            'role' => $this->role,
-            'status' => $this->status,
+            'role' => $this->admin_role ?? 'principal_admin',
+            'status' => self::displayStatus($this->resource),
             'mfaEnabled' => (bool) $this->mfa_enabled,
-            'lastLogin' => $this->last_login_at?->format('Y-m-d H:i'),
-            'lastLoginIp' => $this->last_login_ip,
+            'mfaRequired' => (bool) $this->mfa_required,
+            'lastLogin' => $this->last_login_at?->format('Y-m-d H:i') ?? 'Never',
+            'lastLoginIp' => $this->last_login_ip ?? '—',
             'invitedOn' => $this->invited_at?->toDateString(),
             'createdOn' => $this->created_at?->toDateString(),
         ];
+    }
+
+    public static function displayStatus(User $user): string
+    {
+        if ($user->locked_until && $user->locked_until->isFuture()) {
+            return 'locked';
+        }
+
+        return match ($user->status) {
+            User::STATUS_PENDING => 'invited',
+            User::STATUS_SUSPENDED => 'locked',
+            User::STATUS_INACTIVE => 'disabled',
+            default => 'active',
+        };
     }
 }

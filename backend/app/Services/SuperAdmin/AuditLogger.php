@@ -33,9 +33,12 @@ class AuditLogger
         ?array $oldValues = null,
         ?array $newValues = null,
         string $severity = AuditLog::SEVERITY_INFO,
+        ?User $actor = null,
     ): AuditLog {
+        // Sign-in attempts are recorded before any token exists, so the caller
+        // can name the actor explicitly instead of relying on the request.
         /** @var User|null $actor */
-        $actor = $this->request->user();
+        $actor ??= $this->request->user();
 
         return AuditLog::create([
             'user_id' => $actor?->id,

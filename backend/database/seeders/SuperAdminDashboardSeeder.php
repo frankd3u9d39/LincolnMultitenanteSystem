@@ -26,6 +26,14 @@ class SuperAdminDashboardSeeder extends Seeder
     /** Shared development password for every seeded account. */
     private const DEV_PASSWORD = 'password';
 
+    private ?string $passwordHash = null;
+
+    /** Hashed once: bcrypt is deliberately slow and every account shares the password. */
+    private function devPasswordHash(): string
+    {
+        return $this->passwordHash ??= Hash::make(self::DEV_PASSWORD);
+    }
+
     public function run(): void
     {
         $schools = $this->seedSchools();
@@ -113,7 +121,7 @@ class SuperAdminDashboardSeeder extends Seeder
                 [
                     'school_id' => null,
                     'name' => $name,
-                    'password' => Hash::make(self::DEV_PASSWORD),
+                    'password' => $this->devPasswordHash(),
                     'role' => User::ROLE_SUPERADMIN,
                     'phone' => '+234 802 000 11'.($hoursAgo + 1),
                     'status' => User::STATUS_ACTIVE,
@@ -169,8 +177,9 @@ class SuperAdminDashboardSeeder extends Seeder
                 [
                     'school_id' => $school->id,
                     'name' => $name,
-                    'password' => Hash::make(self::DEV_PASSWORD),
+                    'password' => $this->devPasswordHash(),
                     'role' => User::ROLE_ADMIN,
+                    'admin_role' => 'principal_admin',
                     'phone' => '+234 80'.rand(1, 9).' '.rand(100, 999).' '.rand(1000, 9999),
                     'status' => $status,
                     'mfa_enabled' => $mfa,
@@ -178,6 +187,39 @@ class SuperAdminDashboardSeeder extends Seeder
                     'invited_at' => $status === User::STATUS_PENDING ? now()->subDays(3) : null,
                     'last_login_at' => $hoursAgo === null ? null : now()->subHours($hoursAgo),
                     'last_login_ip' => $hoursAgo === null ? null : '197.210.'.rand(1, 254).'.'.rand(1, 254),
+                ]
+            );
+        }
+
+        // Supporting administrators, so bursars, registrars and deputies exist as data.
+        $supporting = [
+            ['LC-SMTS-001', 'Michael Adeyemi', 'm.adeyemi@lincoln.edu', 'bursar', true, 'active', 2],
+            ['SA-SMTS-002', 'Patience Okoro', 'p.okoro@st-augustine.ac.uk', 'registrar', false, 'active', 30],
+            ['CIC-SMTS-005', 'Chinedu Obiora', 'c.obiora@cambridge-intl.org', 'deputy_admin', true, 'active', 6],
+            ['HVI-SMTS-013', 'Benedict Uche', 'b.uche@highlandvalley.ac.uk', 'deputy_admin', true, 'active', 3],
+        ];
+
+        foreach ($supporting as [$code, $name, $email, $title, $mfa, $status, $hoursAgo]) {
+            $school = $schools->get($code);
+
+            if (! $school) {
+                continue;
+            }
+
+            User::updateOrCreate(
+                ['email' => $email],
+                [
+                    'school_id' => $school->id,
+                    'name' => $name,
+                    'password' => $this->devPasswordHash(),
+                    'role' => User::ROLE_ADMIN,
+                    'admin_role' => $title,
+                    'phone' => '+234 81'.rand(1, 9).' '.rand(100, 999).' '.rand(1000, 9999),
+                    'status' => $status,
+                    'mfa_enabled' => $mfa,
+                    'mfa_enrolled_at' => $mfa ? now()->subMonths(2) : null,
+                    'last_login_at' => now()->subHours($hoursAgo),
+                    'last_login_ip' => '197.211.'.rand(1, 254).'.'.rand(1, 254),
                 ]
             );
         }
@@ -198,7 +240,7 @@ class SuperAdminDashboardSeeder extends Seeder
                     [
                         'school_id' => $school->id,
                         'name' => sprintf('Teacher %d-%d', $index + 1, $n),
-                        'password' => Hash::make(self::DEV_PASSWORD),
+                        'password' => $this->devPasswordHash(),
                         'role' => User::ROLE_TEACHER,
                         'status' => User::STATUS_ACTIVE,
                         'mfa_enabled' => $n % 2 === 0,
@@ -214,7 +256,7 @@ class SuperAdminDashboardSeeder extends Seeder
                     [
                         'school_id' => $school->id,
                         'name' => sprintf('Student %d-%d', $index + 1, $n),
-                        'password' => Hash::make(self::DEV_PASSWORD),
+                        'password' => $this->devPasswordHash(),
                         'role' => User::ROLE_STUDENT,
                         'status' => $n === 6 ? User::STATUS_INACTIVE : User::STATUS_ACTIVE,
                         'mfa_enabled' => false,
@@ -267,47 +309,78 @@ class SuperAdminDashboardSeeder extends Seeder
         }
     }
 
-    /** Platform configuration. No billing category: the platform is free. */
+    /**
+     * Platform configuration, one row per field on the settings screen.
+     * There is no billing category: the platform is free.
+     */
     private function seedPlatformSettings(): void
     {
+        // [category, key, label, value, type, isPublic, isEncrypted]
         $settings = [
-            ['general', 'platform_name', 'Platform Name', 'Lincoln Multi-Tenant Academic Platform', 'string', true],
-            ['general', 'platform_logo_url', 'Platform Logo URL', '/lincoln-logo.png', 'string', true],
-            ['general', 'support_email', 'Support Email', 'platform-support@lincoln.edu', 'string', true],
-            ['general', 'default_timezone', 'Default Timezone', 'Africa/Lagos', 'string', true],
-            ['general', 'maintenance_mode', 'Maintenance Mode', '0', 'boolean', false],
-            ['tenancy', 'onboarding_mode', 'Onboarding Policy', 'approval_required', 'string', false],
-            ['tenancy', 'auto_suspend_inactive_days', 'Auto-Suspension on Inactivity (Days)', '180', 'integer', false],
-            ['tenancy', 'allow_subdomain_customization', 'Allow Custom Subdomains', '1', 'boolean', false],
-            ['tenancy', 'require_domain_verification', 'Require Domain Verification', '1', 'boolean', false],
-            ['limits', 'default_max_students', 'Default Maximum Students', '10000', 'integer', false],
-            ['limits', 'default_max_teachers', 'Default Maximum Faculty & Staff', '800', 'integer', false],
-            ['limits', 'default_storage_quota_gb', 'Default Storage Quota (GB)', '250', 'integer', false],
-            ['limits', 'default_max_file_upload_mb', 'Default Maximum Upload Size (MB)', '50', 'integer', false],
-            ['security', 'enforce_admin_mfa', 'Enforce MFA for Administrators', '1', 'boolean', false],
-            ['security', 'min_password_length', 'Minimum Password Length', '10', 'integer', false],
-            ['security', 'session_timeout_minutes', 'Session Timeout (Minutes)', '30', 'integer', false],
-            ['security', 'max_failed_logins', 'Maximum Failed Sign-in Attempts', '5', 'integer', false],
-            ['mail', 'mail_driver', 'Mail Driver', 'smtp', 'string', false],
-            ['mail', 'smtp_host', 'SMTP Host', 'smtp.mailgun.org', 'string', false],
+            ['general', 'platform_name', 'Platform Name', 'Lincoln Multi-Tenant Academic Platform', 'string', true, false],
+            ['general', 'tagline', 'Tagline', 'Enterprise Multi-School Governance & Management System', 'string', true, false],
+            ['general', 'support_email', 'Support Email', 'platform-support@lincoln.edu', 'string', true, false],
+            ['general', 'support_phone', 'Support Phone', '+234 (0) 800-LINCOLN-SYS', 'string', true, false],
+            ['general', 'helpdesk_url', 'Helpdesk URL', 'https://support.lincolnplatform.io', 'string', true, false],
+            ['general', 'default_timezone', 'Default Timezone', 'Africa/Lagos (GMT+1)', 'string', true, false],
+            ['general', 'default_currency', 'Default Currency', 'NGN (₦)', 'string', true, false],
+            ['general', 'maintenance_mode', 'Maintenance Mode', '0', 'boolean', true, false],
+            ['general', 'maintenance_message', 'Maintenance Message', 'The Lincoln Academic Platform is currently undergoing scheduled infrastructure upgrades. All campus portals will be available shortly.', 'text', true, false],
+            ['general', 'allowed_bypass_ips', 'Maintenance Bypass IPs', '192.168.1.100, 10.0.0.1, 197.210.54.12', 'text', false, false],
+
+            ['tenancy', 'onboarding_mode', 'Onboarding Policy', 'approval_required', 'string', false, false],
+            ['tenancy', 'allow_subdomain_customization', 'Allow Custom Subdomains', '1', 'boolean', false, false],
+            ['tenancy', 'require_domain_verification', 'Require Domain Verification', '1', 'boolean', false, false],
+            ['tenancy', 'auto_suspend_inactive_days', 'Auto-Suspension on Inactivity (Days)', '180', 'integer', false, false],
+
+            ['limits', 'max_students', 'Default Maximum Students', '10000', 'integer', false, false],
+            ['limits', 'max_teachers', 'Default Maximum Faculty & Staff', '800', 'integer', false, false],
+            ['limits', 'storage_quota_gb', 'Default Storage Quota (GB)', '250', 'integer', false, false],
+            ['limits', 'max_file_upload_mb', 'Default Maximum Upload Size (MB)', '50', 'integer', false, false],
+
+            ['security', 'enforce_admin_mfa', 'Enforce MFA for Administrators', '1', 'boolean', false, false],
+            ['security', 'min_password_length', 'Minimum Password Length', '10', 'integer', false, false],
+            ['security', 'require_special_chars', 'Require Special Characters', '1', 'boolean', false, false],
+            ['security', 'require_numbers', 'Require Numbers', '1', 'boolean', false, false],
+            ['security', 'password_expiry_days', 'Password Expiry (Days)', '90', 'integer', false, false],
+            ['security', 'session_timeout_minutes', 'Session Timeout (Minutes)', '30', 'integer', false, false],
+            ['security', 'max_failed_logins', 'Maximum Failed Sign-in Attempts', '5', 'integer', false, false],
+            ['security', 'lockout_duration_minutes', 'Lockout Duration (Minutes)', '15', 'integer', false, false],
+            ['security', 'ip_whitelist_enabled', 'Restrict SuperAdmin Access by IP', '0', 'boolean', false, false],
+            ['security', 'allowed_superadmin_ips', 'Allowed SuperAdmin IPs', '192.168.1.100, 10.0.0.45', 'text', false, false],
+
+            ['mail', 'mail_driver', 'Mail Driver', 'smtp', 'string', false, false],
+            ['mail', 'smtp_host', 'SMTP Host', 'smtp.mailgun.org', 'string', false, false],
+            ['mail', 'smtp_port', 'SMTP Port', '587', 'integer', false, false],
+            ['mail', 'smtp_encryption', 'SMTP Encryption', 'tls', 'string', false, false],
+            ['mail', 'smtp_username', 'SMTP Username', 'postmaster@mg.lincolnplatform.io', 'string', false, false],
             ['mail', 'smtp_password', 'SMTP Password', null, 'string', false, true],
-            ['storage', 'storage_driver', 'Storage Driver', 's3', 'string', false],
-            ['storage', 'backup_retention_days', 'Backup Retention (Days)', '90', 'integer', false],
-            ['telemetry', 'telemetry_collection_enabled', 'Telemetry Collection Enabled', '1', 'boolean', false],
+            ['mail', 'sender_name', 'Sender Name', 'Lincoln Multi-Tenant Platform', 'string', false, false],
+            ['mail', 'sender_email', 'Sender Email', 'notifications@lincolnplatform.io', 'string', false, false],
+
+            ['storage', 'storage_driver', 'Storage Driver', 'local', 'string', false, false],
+            ['storage', 'bucket_name', 'Bucket Name', 'lincoln-multitenant-production-assets', 'string', false, false],
+            ['storage', 'region', 'Region', 'af-south-1', 'string', false, false],
+            ['storage', 'cdn_domain', 'CDN Domain', 'https://cdn.lincolnplatform.io', 'string', false, false],
+            ['storage', 'auto_backup_schedule', 'Automatic Backup Schedule', 'daily', 'string', false, false],
+            ['storage', 'backup_retention_days', 'Backup Retention (Days)', '90', 'integer', false, false],
+            ['storage', 'backup_encryption_enabled', 'Encrypt Backups', '1', 'boolean', false, false],
+            ['storage', 'last_backup_timestamp', 'Last Backup', 'No backup has been taken yet', 'string', false, false],
+
+            ['telemetry', 'telemetry_collection_enabled', 'Telemetry Collection Enabled', '1', 'boolean', false, false],
         ];
 
-        foreach ($settings as $setting) {
-            [$category, $key, $label, $value, $type, $isPublic] = $setting;
-
+        foreach ($settings as [$category, $key, $label, $value, $type, $isPublic, $isEncrypted]) {
             PlatformSetting::updateOrCreate(
                 ['key_name' => $key],
                 [
                     'category' => $category,
                     'display_name' => $label,
-                    'value' => $value,
+                    // Encrypted secrets start unset; an operator enters them in the UI.
+                    'value' => $isEncrypted ? null : $value,
                     'data_type' => $type,
                     'is_public' => $isPublic,
-                    'is_encrypted' => $setting[6] ?? false,
+                    'is_encrypted' => $isEncrypted,
                 ]
             );
         }

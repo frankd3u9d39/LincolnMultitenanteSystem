@@ -58,6 +58,7 @@ class TenantProvisioningService
                 'email' => strtolower($data['principal_email']),
                 'password' => Hash::make($temporaryPassword),
                 'role' => User::ROLE_ADMIN,
+                'admin_role' => 'principal_admin',
                 'phone' => $data['principal_phone'] ?? null,
                 'status' => User::STATUS_PENDING,
                 'mfa_enabled' => false,

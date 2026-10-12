@@ -93,8 +93,8 @@ class PlatformMetricsService
                 $flags[] = 'no_mfa';
             }
 
-            if ($admin->status === User::STATUS_SUSPENDED) {
-                $flags[] = 'suspended';
+            if ($admin->status === User::STATUS_SUSPENDED || ($admin->locked_until && $admin->locked_until->isFuture())) {
+                $flags[] = 'locked';
             }
 
             if ($admin->status === User::STATUS_INACTIVE) {

@@ -52,17 +52,19 @@ class AdministratorDirectoryTest extends TestCase
                 'email' => 'c.nwachukwu@lincoln.edu',
                 'phone' => '+234 803 555 0142',
                 'school_code' => 'LC-SMTS-001',
-                'role' => User::ROLE_ADMIN,
+                'role' => 'deputy_admin',
                 'require_mfa' => true,
             ])
             ->assertCreated()
-            ->assertJsonPath('data.status', User::STATUS_PENDING)
+            ->assertJsonPath('data.status', 'invited')
+            ->assertJsonPath('data.role', 'deputy_admin')
             ->assertJsonPath('data.mfaEnabled', false)
             ->assertJsonPath('data.schoolCode', 'LC-SMTS-001');
 
         $this->assertDatabaseHas('users', [
             'email' => 'c.nwachukwu@lincoln.edu',
             'role' => User::ROLE_ADMIN,
+            'admin_role' => 'deputy_admin',
             'school_id' => $this->school->id,
         ]);
 
@@ -79,7 +81,7 @@ class AdministratorDirectoryTest extends TestCase
                 'email' => 's.jenkins@lincoln.edu',
                 'phone' => '+234 803 555 0142',
                 'school_code' => 'LC-SMTS-001',
-                'role' => User::ROLE_ADMIN,
+                'role' => 'deputy_admin',
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['email']);
@@ -93,7 +95,7 @@ class AdministratorDirectoryTest extends TestCase
                 'email' => 'c.nwachukwu@example.edu',
                 'phone' => '+234 803 555 0142',
                 'school_code' => 'NOPE-SMTS-999',
-                'role' => User::ROLE_ADMIN,
+                'role' => 'deputy_admin',
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['school_code']);
@@ -123,8 +125,10 @@ class AdministratorDirectoryTest extends TestCase
             ->assertOk()
             ->assertJsonPath('affected', 2);
 
-        $this->assertTrue($first->fresh()->mfa_enabled);
-        $this->assertTrue($second->fresh()->mfa_enabled);
+        // Enforcement makes enrolment mandatory; it does not count as enrolled.
+        $this->assertTrue($first->fresh()->mfa_required);
+        $this->assertTrue($second->fresh()->mfa_required);
+        $this->assertFalse($first->fresh()->mfa_enabled);
         $this->assertDatabaseHas('audit_logs', ['event_type' => 'user.mfa_enforced']);
     }
 
@@ -134,10 +138,10 @@ class AdministratorDirectoryTest extends TestCase
 
         $this->actingAs($this->superAdmin, 'sanctum')
             ->patchJson("/api/v1/superadmin/administrators/{$administrator->id}/status", [
-                'status' => User::STATUS_SUSPENDED,
+                'status' => User::STATUS_INACTIVE,
             ])
             ->assertOk()
-            ->assertJsonPath('data.status', User::STATUS_SUSPENDED);
+            ->assertJsonPath('data.status', 'disabled');
 
         $this->assertDatabaseHas('audit_logs', ['event_type' => 'user.suspended']);
     }
