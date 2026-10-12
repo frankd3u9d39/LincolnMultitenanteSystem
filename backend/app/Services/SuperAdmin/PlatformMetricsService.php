@@ -159,7 +159,7 @@ class PlatformMetricsService
     public function tenantReport(int $limit = 50): array
     {
         return School::query()
-            ->with('latestMetric')
+            ->with(['latestMetric', 'administrators:id,school_id,mfa_enabled'])
             ->orderByDesc('storage_used_mb')
             ->limit($limit)
             ->get()
@@ -176,9 +176,151 @@ class PlatformMetricsService
                     'storage_used_gb' => $school->storage_used_gb,
                     'storage_quota_gb' => $school->storage_limit_gb,
                     'storage_usage_percent' => $school->storage_usage_percent,
+                    'compliance_score' => $this->complianceScore($school),
                 ];
             })
             ->all();
+    }
+
+    /**
+     * A transparent 0-100 health score for one tenant. It starts at 100 and
+     * loses points for each concrete risk, so a low score always has a reason.
+     *
+     *   -20  suspended
+     *   -15  not every administrator has multi-factor authentication enrolled
+     *   -10  storage above 85% of quota
+     *   -10  no recorded activity in the last 14 days
+     */
+    public function complianceScore(School $school): int
+    {
+        $score = 100;
+
+        if ($school->isSuspended()) {
+            $score -= 20;
+        }
+
+        $administrators = $school->relationLoaded('administrators') ? $school->administrators : $school->administrators()->get();
+
+        if ($administrators->isNotEmpty() && $administrators->contains(fn (User $admin) => ! $admin->mfa_enabled)) {
+            $score -= 15;
+        }
+
+        if ($school->storage_usage_percent > 85) {
+            $score -= 10;
+        }
+
+        $lastActivity = $school->relationLoaded('latestMetric') ? $school->latestMetric?->last_activity_at : null;
+
+        if ($lastActivity === null || $lastActivity->lt(now()->subDays(self::DORMANT_AFTER_DAYS))) {
+            $score -= 10;
+        }
+
+        return max(0, $score);
+    }
+
+    /**
+     * Platform telemetry for a reporting range, with the immediately preceding
+     * period of equal length for comparison.
+     *
+     * Ranges are bucketed so a chart stays legible: daily up to 30 days,
+     * weekly for a quarter, monthly for the year to date.
+     *
+     * @return array<string, mixed>
+     */
+    public function telemetry(string $range): array
+    {
+        $latest = PlatformTelemetry::query()->max('metric_date');
+
+        if ($latest === null) {
+            return ['range' => $range, 'series' => [], 'summary' => null, 'previous' => null, 'peak' => null, 'baseline' => null];
+        }
+
+        $end = Carbon::parse($latest)->startOfDay();
+        $days = match ($range) {
+            '30d' => 30,
+            'quarter' => 90,
+            'ytd' => max(1, (int) $end->dayOfYear),
+            default => 7,
+        };
+
+        $start = $end->copy()->subDays($days - 1);
+
+        $current = PlatformTelemetry::query()
+            ->whereBetween('metric_date', [$start->toDateString(), $end->toDateString()])
+            ->orderBy('metric_date')
+            ->get();
+
+        $previous = PlatformTelemetry::query()
+            ->whereBetween('metric_date', [$start->copy()->subDays($days)->toDateString(), $start->copy()->subDay()->toDateString()])
+            ->get();
+
+        $summary = $this->summariseTelemetry($current);
+        $before = $previous->isEmpty() ? null : $this->summariseTelemetry($previous);
+
+        $peak = $current->sortByDesc('daily_active_users')->first();
+        $low = $current->sortBy('daily_active_users')->first();
+
+        return [
+            'range' => $range,
+            'days' => $days,
+            'series' => $this->bucketTelemetry($current, $range),
+            'summary' => $summary,
+            'previous' => $before,
+            'changes' => $before === null ? null : [
+                'dauPercent' => $before['avgDau'] > 0 ? round(($summary['avgDau'] - $before['avgDau']) / $before['avgDau'] * 100, 1) : null,
+                'requestsPercent' => $before['avgApiRequests'] > 0 ? round(($summary['avgApiRequests'] - $before['avgApiRequests']) / $before['avgApiRequests'] * 100, 1) : null,
+                'latencyMs' => round($summary['avgLatencyMs'] - $before['avgLatencyMs'], 1),
+            ],
+            'peak' => $peak ? ['date' => $peak->metric_date->toDateString(), 'dau' => $peak->daily_active_users] : null,
+            'baseline' => $low ? ['date' => $low->metric_date->toDateString(), 'dau' => $low->daily_active_users] : null,
+        ];
+    }
+
+    /**
+     * @param  Collection<int, PlatformTelemetry>  $rows
+     * @return array<string, int|float>
+     */
+    private function summariseTelemetry(Collection $rows): array
+    {
+        $requests = (int) $rows->sum('total_api_requests');
+        $errors = (int) $rows->sum('error_count');
+
+        return [
+            'avgDau' => (int) round($rows->avg('daily_active_users') ?? 0),
+            'avgApiRequests' => (int) round($rows->avg('total_api_requests') ?? 0),
+            'avgLatencyMs' => round((float) ($rows->avg('avg_response_time_ms') ?? 0), 1),
+            'avgCpuPercent' => round((float) ($rows->avg('server_cpu_percent') ?? 0), 1),
+            'totalRequests' => $requests,
+            'totalErrors' => $errors,
+            'errorRatePercent' => $requests > 0 ? round($errors / $requests * 100, 4) : 0.0,
+        ];
+    }
+
+    /**
+     * @param  Collection<int, PlatformTelemetry>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function bucketTelemetry(Collection $rows, string $range): array
+    {
+        $groupBy = match ($range) {
+            'quarter' => fn (PlatformTelemetry $row) => $row->metric_date->copy()->startOfWeek()->toDateString(),
+            'ytd' => fn (PlatformTelemetry $row) => $row->metric_date->format('Y-m'),
+            default => fn (PlatformTelemetry $row) => $row->metric_date->toDateString(),
+        };
+
+        return $rows->groupBy($groupBy)->map(function (Collection $bucket, string $key) use ($range) {
+            $first = $bucket->first()->metric_date;
+
+            return [
+                'date' => $key,
+                'label' => $range === 'ytd' ? $first->format('M') : ($range === 'quarter' ? $first->copy()->startOfWeek()->format('j M') : $first->format('j M')),
+                'dau' => (int) round($bucket->avg('daily_active_users')),
+                'apiRequests' => (int) round($bucket->avg('total_api_requests')),
+                'latencyMs' => round((float) $bucket->avg('avg_response_time_ms'), 1),
+                'cpu' => round((float) $bucket->avg('server_cpu_percent'), 1),
+                'errors' => (int) $bucket->sum('error_count'),
+            ];
+        })->values()->all();
     }
 
     /**

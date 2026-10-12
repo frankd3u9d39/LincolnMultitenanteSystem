@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /** GROUP 4: SuperAdmin Module - daily platform-wide infrastructure snapshot. */
 class PlatformTelemetry extends Model
@@ -32,7 +34,6 @@ class PlatformTelemetry extends Model
     protected function casts(): array
     {
         return [
-            'metric_date' => 'date',
             'active_schools_count' => 'integer',
             'pending_schools_count' => 'integer',
             'suspended_schools_count' => 'integer',
@@ -47,5 +48,21 @@ class PlatformTelemetry extends Model
             'storage_used_gb' => 'float',
             'error_count' => 'integer',
         ];
+    }
+
+    /**
+     * A calendar day, stored as a plain Y-m-d string.
+     *
+     * Eloquent's own "date" cast writes a full "Y-m-d 00:00:00" timestamp, which
+     * breaks both range queries (the last day compares greater than a bare date)
+     * and updateOrCreate (an existing row no longer matches, so a duplicate is
+     * inserted). Keeping the raw value a date string avoids both.
+     */
+    protected function metricDate(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value) => $value ? Carbon::parse($value)->startOfDay() : null,
+            set: fn ($value) => $value ? Carbon::parse($value)->toDateString() : null,
+        );
     }
 }

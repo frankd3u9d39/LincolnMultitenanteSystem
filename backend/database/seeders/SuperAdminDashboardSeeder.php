@@ -411,28 +411,41 @@ class SuperAdminDashboardSeeder extends Seeder
         );
     }
 
-    /** Seven days of platform-wide infrastructure snapshots. */
+    /**
+     * Ten months of daily platform snapshots, so every reporting range (week,
+     * month, quarter, year to date) and its prior-period comparison has data.
+     * Usage grows steadily with a weekday/weekend rhythm and a little
+     * deterministic noise, so reseeding gives the same charts every time.
+     */
     private function seedTelemetry(): void
     {
-        foreach (range(6, 0) as $daysAgo) {
-            $date = now()->subDays($daysAgo)->toDateString();
+        $days = 300;
+
+        foreach (range($days - 1, 0) as $daysAgo) {
+            $date = now()->subDays($daysAgo);
+            $progress = 1 - ($daysAgo / $days);
+            $weekend = $date->isWeekend() ? 0.62 : 1.0;
+            $noise = ((crc32($date->toDateString()) % 100) - 50) / 1000;
+
+            $dau = (int) round((6200 + 3600 * $progress) * $weekend * (1 + $noise));
+            $requests = (int) round($dau * (118 + 140 * $noise));
 
             PlatformTelemetry::updateOrCreate(
-                ['metric_date' => $date],
+                ['metric_date' => $date->toDateString()],
                 [
                     'active_schools_count' => 18,
                     'pending_schools_count' => 1,
                     'suspended_schools_count' => 1,
-                    'total_students_count' => 16210 - ($daysAgo * 12),
+                    'total_students_count' => 14200 + (int) round(2010 * $progress),
                     'total_teachers_count' => 1118,
                     'total_admins_count' => 20,
-                    'daily_active_users' => 9400 - ($daysAgo * 150),
-                    'total_api_requests' => 1250000 - ($daysAgo * 18000),
-                    'avg_response_time_ms' => round(38 + ($daysAgo % 4) * 1.4, 2),
-                    'server_cpu_percent' => round(32 + ($daysAgo % 5) * 2.1, 2),
-                    'server_ram_percent' => round(56 + ($daysAgo % 3) * 1.8, 2),
-                    'storage_used_gb' => 1390.25,
-                    'error_count' => 3 + ($daysAgo % 4),
+                    'daily_active_users' => $dau,
+                    'total_api_requests' => $requests,
+                    'avg_response_time_ms' => round(44 - 6 * $progress + $noise * 20, 2),
+                    'server_cpu_percent' => round(24 + 14 * $progress * $weekend + $noise * 12, 2),
+                    'server_ram_percent' => round(48 + 10 * $progress + $noise * 8, 2),
+                    'storage_used_gb' => round(1100 + 290 * $progress, 2),
+                    'error_count' => max(0, (int) round($requests / 400000 + $noise * 30)),
                 ]
             );
         }

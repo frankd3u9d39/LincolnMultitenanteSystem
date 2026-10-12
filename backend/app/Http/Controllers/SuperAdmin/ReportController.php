@@ -21,6 +21,7 @@ class ReportController extends Controller
     {
         $validated = $request->validate([
             'limit' => ['sometimes', 'integer', 'min:1', 'max:200'],
+            'range' => ['sometimes', 'string', 'in:7d,30d,quarter,ytd'],
         ]);
 
         return response()->json([
@@ -28,6 +29,7 @@ class ReportController extends Controller
                 'overview' => $this->metrics->overview(),
                 'campusSizeDistribution' => $this->metrics->campusSizeDistribution(),
                 'tenants' => $this->metrics->tenantReport($validated['limit'] ?? 50),
+                'telemetry' => $this->metrics->telemetry($validated['range'] ?? '7d'),
             ],
         ]);
     }

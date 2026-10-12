@@ -28,7 +28,7 @@ class AuditLogController extends Controller
             ->withQueryString();
 
         return AuditLogResource::collection($logs)
-            ->additional(['meta' => ['severityCounts' => $this->severityCounts()]])
+            ->additional(['meta' => ['severityCounts' => $this->severityCounts(), 'headline' => $this->headline()]])
             ->response();
     }
 
@@ -100,6 +100,31 @@ class AuditLogController extends Controller
                 fn ($query) => $query->where('school_id', $filters['school_id'])
             )
             ->orderByDesc('created_at');
+    }
+
+    /**
+     * The three figures above the audit table.
+     *
+     * @return array<string, int>
+     */
+    private function headline(): array
+    {
+        return [
+            'totalEvents' => AuditLog::query()->count(),
+            // Critical events in the last day: lockouts, mass revocations, anomalies.
+            'criticalLast24h' => AuditLog::query()
+                ->where('severity', AuditLog::SEVERITY_CRITICAL)
+                ->where('created_at', '>=', now()->subDay())
+                ->count(),
+            // Changes an operator made to tenants, accounts or configuration.
+            'administrativeChanges' => AuditLog::query()
+                ->where(function ($query) {
+                    $query->where('event_type', 'like', 'tenant.%')
+                        ->orWhere('event_type', 'like', 'user.%')
+                        ->orWhere('event_type', 'like', 'platform.%');
+                })
+                ->count(),
+        ];
     }
 
     /** @return array<string, int> */
