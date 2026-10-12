@@ -56,19 +56,90 @@ class PlatformMetricsService
                 'needs_attention' => (int) $schoolsByStatus->sum()
                     - (int) ($schoolsByStatus[School::STATUS_ACTIVE] ?? 0),
             ],
-            'population' => [
-                'students' => (int) ($usersByRole[User::ROLE_STUDENT] ?? 0),
-                'teachers' => (int) ($usersByRole[User::ROLE_TEACHER] ?? 0),
-                'administrators' => (int) ($usersByRole[User::ROLE_ADMIN] ?? 0),
-                'superadmins' => (int) ($usersByRole[User::ROLE_SUPERADMIN] ?? 0),
-                'total' => (int) $usersByRole->sum(),
-            ],
+            'population' => $this->population($usersByRole),
             'storage' => [
                 'used_gb' => $usedGb,
                 'quota_gb' => $quotaGb,
                 'usage_percent' => $quotaGb > 0 ? round($usedGb / $quotaGb * 100, 1) : 0.0,
             ],
             'infrastructure' => $this->latestTelemetry(),
+        ];
+    }
+
+    /**
+     * Verifies the tenant boundary holds in the data, by counting records that
+     * break it. Each check is a query that should return nothing; a non-zero
+     * count is a violation. This is a data-integrity audit, not a penetration
+     * test: it cannot prove a query is scoped, only that no row has escaped.
+     *
+     * @return array{passed: bool, checkedAt: string, checks: array<int, array{label: string, violations: int}>}
+     */
+    public function tenantIsolationCheck(): array
+    {
+        $liveSchools = School::query()->select('id');
+
+        $checks = [
+            [
+                'label' => 'Every school account belongs to a tenant',
+                'violations' => User::query()->where('role', '!=', User::ROLE_SUPERADMIN)->whereNull('school_id')->count(),
+            ],
+            [
+                'label' => 'SuperAdmin accounts sit outside every tenant',
+                'violations' => User::query()->where('role', User::ROLE_SUPERADMIN)->whereNotNull('school_id')->count(),
+            ],
+            [
+                'label' => 'No account points at a missing or deleted school',
+                'violations' => User::query()->whereNotNull('school_id')->whereNotIn('school_id', $liveSchools)->count(),
+            ],
+            [
+                'label' => 'No usage snapshot points at a missing or deleted school',
+                'violations' => SchoolMetric::query()->whereNotIn('school_id', $liveSchools)->count(),
+            ],
+            [
+                'label' => 'No audit entry points at a missing or deleted school',
+                'violations' => AuditLog::query()->whereNotNull('school_id')->whereNotIn('school_id', $liveSchools)->count(),
+            ],
+        ];
+
+        return [
+            'passed' => collect($checks)->every(fn (array $check) => $check['violations'] === 0),
+            'checkedAt' => now()->toIso8601String(),
+            'checks' => $checks,
+        ];
+    }
+
+    /**
+     * Campus population, taken from each school's latest metrics snapshot so the
+     * dashboard agrees with the tenant registry, which reads the same snapshots.
+     * Where no snapshot exists yet it falls back to counting accounts.
+     *
+     * @param  Collection<string, int>  $usersByRole
+     * @return array<string, int>
+     */
+    private function population(Collection $usersByRole): array
+    {
+        $latest = SchoolMetric::query()
+            ->joinSub(
+                SchoolMetric::query()->select('school_id', DB::raw('max(metric_date) as latest_date'))->groupBy('school_id'),
+                'latest',
+                fn ($join) => $join->on('school_metrics.school_id', '=', 'latest.school_id')
+                    ->on('school_metrics.metric_date', '=', 'latest.latest_date')
+            )
+            ->selectRaw('coalesce(sum(student_count), 0) as students, coalesce(sum(teacher_count), 0) as teachers')
+            ->first();
+
+        $hasSnapshots = SchoolMetric::query()->exists();
+        $students = $hasSnapshots ? (int) $latest->students : (int) ($usersByRole[User::ROLE_STUDENT] ?? 0);
+        $teachers = $hasSnapshots ? (int) $latest->teachers : (int) ($usersByRole[User::ROLE_TEACHER] ?? 0);
+        $administrators = (int) ($usersByRole[User::ROLE_ADMIN] ?? 0);
+        $superadmins = (int) ($usersByRole[User::ROLE_SUPERADMIN] ?? 0);
+
+        return [
+            'students' => $students,
+            'teachers' => $teachers,
+            'administrators' => $administrators,
+            'superadmins' => $superadmins,
+            'total' => $students + $teachers + $administrators + $superadmins,
         ];
     }
 

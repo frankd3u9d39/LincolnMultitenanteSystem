@@ -8,6 +8,7 @@ use App\Http\Resources\SuperAdmin\AdministratorResource;
 use App\Models\AuditLog;
 use App\Models\School;
 use App\Models\User;
+use App\Services\SuperAdmin\AdminCapabilities;
 use App\Services\SuperAdmin\AuditLogger;
 use App\Services\SuperAdmin\PlatformMetricsService;
 use Illuminate\Http\JsonResponse;
@@ -226,6 +227,65 @@ class AdministratorController extends Controller
                 $count === 1 ? '' : 's'
             ),
             'affected' => $count,
+        ]);
+    }
+
+    /** The capability catalogue and what this administrator currently holds. */
+    public function permissions(User $administrator, AdminCapabilities $capabilities): JsonResponse
+    {
+        abort_unless($administrator->role === User::ROLE_ADMIN, Response::HTTP_NOT_FOUND);
+
+        return response()->json([
+            'data' => [
+                'groups' => $capabilities->groups(),
+                'granted' => $capabilities->grantedFor($administrator),
+                'defaults' => $capabilities->defaultsFor($administrator->admin_role),
+                'customised' => $administrator->permissions !== null,
+            ],
+        ]);
+    }
+
+    /** Replaces the administrator's granted capabilities, and audits what changed. */
+    public function updatePermissions(Request $request, User $administrator, AdminCapabilities $capabilities): JsonResponse
+    {
+        abort_unless($administrator->role === User::ROLE_ADMIN, Response::HTTP_NOT_FOUND);
+
+        $validated = $request->validate([
+            'granted' => ['present', 'array'],
+            'granted.*' => ['string', 'in:'.implode(',', $capabilities->keys())],
+        ]);
+
+        $granted = array_values(array_unique($validated['granted']));
+        $missing = array_diff($capabilities->lockedFor($administrator->admin_role), $granted);
+
+        if ($missing !== []) {
+            return response()->json([
+                'message' => 'A principal administrator must keep the capability to invite administrators.',
+                'errors' => ['granted' => ['A principal administrator must keep the capability to invite administrators.']],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $before = $capabilities->grantedFor($administrator);
+        $administrator->forceFill(['permissions' => $granted])->save();
+
+        $added = array_values(array_diff($granted, $before));
+        $removed = array_values(array_diff($before, $granted));
+
+        if ($added !== [] || $removed !== []) {
+            $this->audit->recordUserChange(
+                eventType: 'user.permissions_changed',
+                action: 'Changed Administrator Permissions',
+                description: sprintf('Permissions for %s changed: %d granted, %d revoked.', $administrator->name, count($added), count($removed)),
+                subject: $administrator,
+                oldValues: ['revoked' => $removed],
+                newValues: ['granted' => $added],
+                severity: $removed === [] ? AuditLog::SEVERITY_INFO : AuditLog::SEVERITY_WARNING,
+            );
+        }
+
+        return response()->json([
+            'message' => sprintf('Permissions updated for %s: %d granted, %d revoked. Change written to the audit trail.', $administrator->name, count($added), count($removed)),
+            'data' => ['granted' => $granted, 'customised' => true],
         ]);
     }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Models\AuditLog;
 use App\Models\PlatformSetting;
 use App\Models\User;
@@ -74,6 +75,13 @@ class AuthController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
+        // Maintenance mode keeps everyone but SuperAdmins (and bypass addresses) out.
+        if (PlatformSetting::valueOf('maintenance_mode', false)
+            && ! $user->isSuperAdmin()
+            && ! EnforceMaintenanceMode::isBypassed($request->ip())) {
+            return EnforceMaintenanceMode::blocked();
+        }
+
         if ($user->mfa_enabled && $user->mfa_secret) {
             $code = (string) ($credentials['code'] ?? '');
 
@@ -111,6 +119,8 @@ class AuthController extends Controller
         return response()->json([
             'token' => $token->plainTextToken,
             'user' => $this->userPayload($user),
+            // The account must enrol an authenticator before it is fully usable.
+            'mfaSetupRequired' => $this->mfaSetupRequired($user),
         ]);
     }
 
@@ -273,6 +283,18 @@ class AuthController extends Controller
             'ip_address' => $request->ip(),
             'user_agent' => substr((string) $request->userAgent(), 0, 500),
         ])->save();
+    }
+
+    /** Enrolment is mandatory for this account, by policy or because it was enforced individually. */
+    private function mfaSetupRequired(User $user): bool
+    {
+        if ($user->mfa_enabled) {
+            return false;
+        }
+
+        $policy = $user->role === User::ROLE_ADMIN && PlatformSetting::valueOf('enforce_admin_mfa', false);
+
+        return $policy || $user->mfa_required;
     }
 
     private function minPasswordLength(): int

@@ -112,6 +112,15 @@ class PlatformSettingController extends Controller
                 }
             }
 
+            // Turning on the IP allow-list without your own address on it would
+            // end your access mid-save, so that combination is refused.
+            if (PlatformSetting::valueOf('ip_whitelist_enabled', false)
+                && ! in_array(request()->ip(), PlatformSetting::addressList('allowed_superadmin_ips'), true)) {
+                throw ValidationException::withMessages([
+                    'settings' => [sprintf('Your current address (%s) must be on the SuperAdmin allow-list before you can enable it.', request()->ip())],
+                ]);
+            }
+
             return $diff;
         });
 

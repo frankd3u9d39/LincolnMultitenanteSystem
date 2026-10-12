@@ -47,6 +47,18 @@ class PlatformSetting extends Model
             : $setting->typed_value;
     }
 
+    /**
+     * A comma-separated list setting (such as an IP allow-list) as clean values.
+     *
+     * @return list<string>
+     */
+    public static function addressList(string $key): array
+    {
+        $raw = (string) static::valueOf($key, '');
+
+        return array_values(array_filter(array_map('trim', explode(',', $raw)), fn (string $item) => $item !== ''));
+    }
+
     /** Whether any value has been stored (used where the value itself is hidden). */
     public function getHasValueAttribute(): bool
     {

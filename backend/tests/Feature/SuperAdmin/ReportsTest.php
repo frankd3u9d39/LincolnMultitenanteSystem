@@ -110,6 +110,52 @@ class ReportsTest extends TestCase
         $this->assertSame(45, $service->complianceScore($risky->load(['latestMetric', 'administrators'])));
     }
 
+    public function test_the_dashboard_population_matches_what_the_registry_shows(): void
+    {
+        $one = $this->school('LC-SMTS-001', 'one.edu');
+        $two = $this->school('RK-SMTS-002', 'two.edu');
+
+        // An older snapshot must not be counted alongside the newer one.
+        SchoolMetric::create(['school_id' => $one->id, 'metric_date' => today()->subDays(3)->toDateString(), 'student_count' => 900, 'teacher_count' => 50]);
+        SchoolMetric::create(['school_id' => $one->id, 'metric_date' => today()->toDateString(), 'student_count' => 1000, 'teacher_count' => 60]);
+        SchoolMetric::create(['school_id' => $two->id, 'metric_date' => today()->toDateString(), 'student_count' => 500, 'teacher_count' => 30]);
+
+        $this->actingAs($this->superAdmin, 'sanctum')
+            ->getJson('/api/v1/superadmin/dashboard')
+            ->assertJsonPath('data.population.students', 1500)
+            ->assertJsonPath('data.population.teachers', 90);
+
+        $registry = collect($this->actingAs($this->superAdmin, 'sanctum')->getJson('/api/v1/superadmin/schools')->json('data'));
+        $this->assertSame(1500, $registry->sum('students'));
+    }
+
+    public function test_the_isolation_check_passes_on_clean_data_and_names_each_violation(): void
+    {
+        $school = $this->school('LC-SMTS-001', 'lincoln.edu');
+        $this->admin($school, mfa: true);
+
+        $report = fn () => $this->actingAs($this->superAdmin, 'sanctum')
+            ->getJson('/api/v1/superadmin/system-reports')
+            ->json('data.isolation');
+
+        $this->assertTrue($report()['passed']);
+        $this->assertCount(5, $report()['checks']);
+
+        // An administrator with no tenant, and an account left pointing at a deleted school.
+        User::create(['name' => 'Orphan', 'email' => 'orphan@x.edu', 'password' => 'x', 'role' => User::ROLE_ADMIN, 'status' => 'active']);
+        $gone = $this->school('GN-SMTS-009', 'gone.edu');
+        User::create(['school_id' => $gone->id, 'name' => 'Stranded', 'email' => 'stranded@gone.edu', 'password' => 'x', 'role' => User::ROLE_TEACHER, 'status' => 'active']);
+        $gone->delete();
+
+        $result = $report();
+        $this->assertFalse($result['passed']);
+
+        $violations = collect($result['checks'])->pluck('violations', 'label');
+        $this->assertSame(1, $violations['Every school account belongs to a tenant']);
+        $this->assertSame(1, $violations['No account points at a missing or deleted school']);
+        $this->assertSame(0, $violations['SuperAdmin accounts sit outside every tenant']);
+    }
+
     public function test_the_tenant_report_carries_each_tenants_compliance_score(): void
     {
         $school = $this->school('LC-SMTS-001', 'healthy.edu');

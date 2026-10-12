@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureSuperAdmin;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -13,6 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Group 4: platform maintenance mode applies to every API request.
+        $middleware->api(append: [EnforceMaintenanceMode::class]);
+
         // Group 4: gates every /api/v1/superadmin route behind the superadmin role.
         $middleware->alias([
             'superadmin' => EnsureSuperAdmin::class,

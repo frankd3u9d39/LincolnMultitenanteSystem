@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\SuperAdmin\StoreSchoolRequest;
 use App\Http\Requests\SuperAdmin\UpdateStorageQuotaRequest;
 use App\Http\Resources\SuperAdmin\SchoolResource;
+use App\Models\AuditLog;
 use App\Models\School;
+use App\Services\SuperAdmin\AuditLogger;
 use App\Services\SuperAdmin\TenantProvisioningService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -123,6 +125,36 @@ class SchoolController extends Controller
         return response()->json([
             'message' => sprintf('%s suspended. All campus sign-ins are now blocked.', $updated->name),
             'data' => new SchoolResource($updated->load(['latestMetric', 'administrators'])),
+        ]);
+    }
+
+    /**
+     * Records that the operator is working inside this tenant for a support
+     * task. The SuperAdmin API already reads across tenants, so this grants no
+     * extra capability; it exists so the access is on the audit trail with a
+     * stated reason and an expiry, and it does not notify the school.
+     */
+    public function supportAccess(Request $request, School $school, AuditLogger $audit): JsonResponse
+    {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:255'],
+        ]);
+
+        $minutes = 30;
+        $expiresAt = now()->addMinutes($minutes);
+
+        $audit->recordTenantChange(
+            eventType: 'tenant.support_access',
+            action: 'Logged Support Access',
+            description: sprintf('Support access to %s (%s) logged for %d minutes. Reason: %s', $school->name, $school->code, $minutes, $validated['reason']),
+            school: $school,
+            newValues: ['reason' => $validated['reason'], 'expires_at' => $expiresAt->toIso8601String()],
+            severity: AuditLog::SEVERITY_WARNING,
+        );
+
+        return response()->json([
+            'message' => sprintf('Support access to %s logged for %d minutes and recorded in the audit trail.', $school->name, $minutes),
+            'expiresAt' => $expiresAt->toIso8601String(),
         ]);
     }
 

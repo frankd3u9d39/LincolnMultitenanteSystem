@@ -154,6 +154,27 @@ class SchoolRegistryTest extends TestCase
         ]);
     }
 
+    public function test_support_access_needs_a_reason_and_is_audited_as_a_warning(): void
+    {
+        $school = $this->makeSchool();
+
+        $this->actingAs($this->superAdmin, 'sanctum')
+            ->postJson("/api/v1/superadmin/schools/{$school->id}/support-access", [])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['reason']);
+
+        $this->actingAs($this->superAdmin, 'sanctum')
+            ->postJson("/api/v1/superadmin/schools/{$school->id}/support-access", ['reason' => 'Investigating a result import'])
+            ->assertOk()
+            ->assertJsonStructure(['message', 'expiresAt']);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'event_type' => 'tenant.support_access',
+            'school_id' => $school->id,
+            'severity' => AuditLog::SEVERITY_WARNING,
+        ]);
+    }
+
     public function test_registry_filters_by_status_and_search(): void
     {
         $this->makeSchool();

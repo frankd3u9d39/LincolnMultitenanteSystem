@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\PlatformSetting;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
@@ -35,6 +36,14 @@ class EnsureSuperAdmin
         if ($user->status !== User::STATUS_ACTIVE) {
             return response()->json([
                 'message' => 'This SuperAdmin account is not active.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Optional allow-list: when on, SuperAdmin access is limited to named addresses.
+        if (PlatformSetting::valueOf('ip_whitelist_enabled', false)
+            && ! in_array($request->ip(), PlatformSetting::addressList('allowed_superadmin_ips'), true)) {
+            return response()->json([
+                'message' => 'SuperAdmin access is restricted to approved IP addresses, and yours is not on the list.',
             ], Response::HTTP_FORBIDDEN);
         }
 

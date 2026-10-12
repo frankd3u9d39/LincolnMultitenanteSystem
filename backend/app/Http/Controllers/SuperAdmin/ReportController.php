@@ -30,6 +30,7 @@ class ReportController extends Controller
                 'campusSizeDistribution' => $this->metrics->campusSizeDistribution(),
                 'tenants' => $this->metrics->tenantReport($validated['limit'] ?? 50),
                 'telemetry' => $this->metrics->telemetry($validated['range'] ?? '7d'),
+                'isolation' => $this->metrics->tenantIsolationCheck(),
             ],
         ]);
     }

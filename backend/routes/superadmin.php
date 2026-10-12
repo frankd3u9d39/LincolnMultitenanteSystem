@@ -44,6 +44,7 @@ Route::prefix('superadmin')
         Route::patch('/schools/{school}/quota', [SchoolController::class, 'updateQuota'])->name('schools.quota');
         Route::post('/schools/{school}/suspend', [SchoolController::class, 'suspend'])->name('schools.suspend');
         Route::post('/schools/{school}/reinstate', [SchoolController::class, 'reinstate'])->name('schools.reinstate');
+        Route::post('/schools/{school}/support-access', [SchoolController::class, 'supportAccess'])->name('schools.support-access');
 
         // Tenant governance: administrators
         Route::get('/administrators', [AdministratorController::class, 'index'])->name('administrators.index');
@@ -53,6 +54,8 @@ Route::prefix('superadmin')
         Route::post('/administrators/password-resets', [AdministratorController::class, 'sendPasswordResets'])->name('administrators.password-resets');
         Route::get('/administrators/{administrator}', [AdministratorController::class, 'show'])->name('administrators.show');
         Route::patch('/administrators/{administrator}/status', [AdministratorController::class, 'updateStatus'])->name('administrators.status');
+        Route::get('/administrators/{administrator}/permissions', [AdministratorController::class, 'permissions'])->name('administrators.permissions');
+        Route::put('/administrators/{administrator}/permissions', [AdministratorController::class, 'updatePermissions'])->name('administrators.permissions.update');
 
         // Cross-tenant identity directory
         Route::get('/system-users', [SystemUserController::class, 'index'])->name('users.index');

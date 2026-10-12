@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SuperAdmin;
 
+use App\Models\AuditLog;
 use App\Models\School;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -144,6 +145,61 @@ class AdministratorDirectoryTest extends TestCase
             ->assertJsonPath('data.status', 'disabled');
 
         $this->assertDatabaseHas('audit_logs', ['event_type' => 'user.suspended']);
+    }
+
+    public function test_permissions_default_to_the_administrators_title(): void
+    {
+        $bursar = $this->makeAdministrator('bursar@lincoln.edu', ['admin_role' => 'bursar']);
+
+        $response = $this->actingAs($this->superAdmin, 'sanctum')
+            ->getJson("/api/v1/superadmin/administrators/{$bursar->id}/permissions")
+            ->assertOk()
+            ->assertJsonPath('data.customised', false);
+
+        $granted = $response->json('data.granted');
+        $this->assertContains('fees.configure', $granted);
+        $this->assertNotContains('students.manage', $granted);
+        $this->assertCount(4, $response->json('data.groups'));
+    }
+
+    public function test_changing_permissions_is_saved_and_audited_as_a_diff(): void
+    {
+        $bursar = $this->makeAdministrator('bursar@lincoln.edu', ['admin_role' => 'bursar']);
+
+        $this->actingAs($this->superAdmin, 'sanctum')
+            ->putJson("/api/v1/superadmin/administrators/{$bursar->id}/permissions", [
+                // Drops fees.configure and payments.reconcile, adds students.manage.
+                'granted' => ['reports.export', 'students.manage'],
+            ])
+            ->assertOk();
+
+        $this->assertEqualsCanonicalizing(['reports.export', 'students.manage'], $bursar->fresh()->permissions);
+
+        $log = AuditLog::where('event_type', 'user.permissions_changed')->first();
+        $this->assertSame(['students.manage'], $log->new_values['granted']);
+        $this->assertEqualsCanonicalizing(['fees.configure', 'payments.reconcile'], $log->old_values['revoked']);
+        $this->assertSame('warning', $log->severity);
+    }
+
+    public function test_a_principal_administrator_cannot_lose_the_invite_capability(): void
+    {
+        $principal = $this->makeAdministrator('principal@lincoln.edu', ['admin_role' => 'principal_admin']);
+
+        $this->actingAs($this->superAdmin, 'sanctum')
+            ->putJson("/api/v1/superadmin/administrators/{$principal->id}/permissions", ['granted' => ['reports.export']])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['granted']);
+
+        $this->assertNull($principal->fresh()->permissions);
+    }
+
+    public function test_unknown_capabilities_are_rejected(): void
+    {
+        $bursar = $this->makeAdministrator('bursar@lincoln.edu', ['admin_role' => 'bursar']);
+
+        $this->actingAs($this->superAdmin, 'sanctum')
+            ->putJson("/api/v1/superadmin/administrators/{$bursar->id}/permissions", ['granted' => ['launch.missiles']])
+            ->assertUnprocessable();
     }
 
     public function test_access_report_computes_mfa_coverage_and_flags(): void
