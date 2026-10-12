@@ -1,6 +1,12 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\Teacher\TeacherDashboardController;
+use App\Http\Controllers\Api\Teacher\TeacherClassController;
+use App\Http\Controllers\Api\Teacher\TeacherStudentController;
+use App\Http\Controllers\Api\Teacher\TeacherAttendanceController;
+use App\Http\Controllers\Api\Teacher\TeacherAssignmentController;
+use App\Http\Controllers\Api\Teacher\TeacherAnnouncementController;
 
 /**
  * ============================================================================
@@ -20,12 +26,22 @@ use Illuminate\Support\Facades\Route;
  *   - All routes in this group operate under the teacher's school_id tenant boundary.
  */
 
+// We assume these would eventually be protected by auth:sanctum
 Route::prefix('teacher')->name('teacher.')->group(function () {
-    // Route placeholders for future feature implementation:
-    // Route::get('/profile', [TeacherProfileController::class, 'show'])->name('profile');
-    // Route::get('/classes', [TeacherClassController::class, 'index'])->name('classes.index');
-    // Route::get('/students', [TeacherStudentController::class, 'index'])->name('students.index');
-    // Route::post('/attendance', [TeacherAttendanceController::class, 'store'])->name('attendance.store');
-    // Route::resource('/assignments', TeacherAssignmentController::class);
-    // Route::post('/grading', [TeacherGradingController::class, 'store'])->name('grading.store');
+    // Dashboard Stats
+    Route::get('/dashboard', [TeacherDashboardController::class, 'index'])->name('dashboard');
+
+    // Classes & Students
+    Route::get('/classes', [TeacherClassController::class, 'index'])->name('classes.index');
+    Route::get('/classes/{schoolClass}/students', [TeacherStudentController::class, 'index'])->name('students.index');
+
+    // Attendance
+    Route::get('/attendance/classes', [TeacherAttendanceController::class, 'getClasses'])->name('attendance.classes');
+    Route::post('/attendance', [TeacherAttendanceController::class, 'store'])->name('attendance.store');
+
+    // Assignments
+    Route::apiResource('assignments', TeacherAssignmentController::class);
+
+    // Announcements / Notices
+    Route::apiResource('announcements', TeacherAnnouncementController::class);
 });
