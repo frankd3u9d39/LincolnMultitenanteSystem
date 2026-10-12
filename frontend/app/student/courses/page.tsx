@@ -2,22 +2,26 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-
-// Mock Data
-const COURSES = [
-  { id: 1, name: 'Advanced Physics', code: 'PHY-401', instructor: 'Dr. Sarah Jenkins', credits: 4, schedule: 'Mon, Wed 09:00 AM', progress: 68, imageColor: 'bg-emerald-600', status: 'In Progress' },
-  { id: 2, name: 'Calculus III', code: 'MAT-302', instructor: 'Prof. David Mercer', credits: 4, schedule: 'Tue, Thu 11:00 AM', progress: 45, imageColor: 'bg-blue-600', status: 'In Progress' },
-  { id: 3, name: 'Computer Science', code: 'CSC-201', instructor: 'Alan Turing', credits: 3, schedule: 'Mon, Wed 02:00 PM', progress: 82, imageColor: 'bg-indigo-600', status: 'In Progress' },
-  { id: 4, name: 'English Literature', code: 'LIT-105', instructor: 'Eleanor Vance', credits: 3, schedule: 'Fri 10:00 AM', progress: 30, imageColor: 'bg-amber-600', status: 'In Progress' },
-  { id: 5, name: 'World History', code: 'HIS-204', instructor: 'Dr. Julian Thorne', credits: 3, schedule: 'Tue, Thu 01:00 PM', progress: 100, imageColor: 'bg-rose-600', status: 'Completed' },
-  { id: 6, name: 'Organic Chemistry', code: 'CHE-301', instructor: 'Dr. Fiona Gallagher', credits: 4, schedule: 'Mon, Wed, Fri 08:00 AM', progress: 12, imageColor: 'bg-teal-600', status: 'In Progress' },
-];
+import { useAsync } from '@/modules/superadmin/hooks/useAsync';
+import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
+import { listMyCourses } from '@/modules/student/services/api';
 
 export default function StudentCoursesPage() {
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const { data, loading, error, reload } = useAsync((signal) => listMyCourses(signal), []);
 
-  const filteredCourses = COURSES.filter(c => {
+  if (loading) {
+    return <LoadingBlock rows={6} label="Loading courses" />;
+  }
+
+  if (error || !data) {
+    return <ErrorBlock message={error ?? 'No data available.'} onRetry={reload} />;
+  }
+
+  const courses = data.map((c) => ({ ...c, imageColor: c.color }));
+
+  const filteredCourses = courses.filter(c => {
     const matchFilter = filter === 'All' || c.status === filter;
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchSearch;
@@ -148,7 +152,7 @@ export default function StudentCoursesPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
           </svg>
           <h3 className="text-sm font-bold text-zinc-900">No courses found</h3>
-          <p className="text-xs text-zinc-500 mt-1 max-w-[250px]">We couldn't find any courses matching your current filters or search query.</p>
+          <p className="text-xs text-zinc-500 mt-1 max-w-[250px]">We couldn&apos;t find any courses matching your current filters or search query.</p>
         </div>
       )}
     </div>

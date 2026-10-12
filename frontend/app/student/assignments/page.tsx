@@ -1,17 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
-
-// Mock Data for Assignments
-const ASSIGNMENTS = [
-  { id: 1, title: 'Chapter 4: Thermodynamics Problem Set', course: 'Advanced Physics (PHY-401)', dueDate: '2026-10-10T23:59:00', status: 'Pending', type: 'Homework', points: 100 },
-  { id: 2, title: 'Midterm Essay on Hamlet', course: 'English Literature (LIT-105)', dueDate: '2026-10-12T17:00:00', status: 'Pending', type: 'Essay', points: 200 },
-  { id: 3, title: 'Binary Trees Implementation', course: 'Data Structures (CSC-205)', dueDate: '2026-10-05T23:59:00', status: 'Overdue', type: 'Project', points: 150 },
-  { id: 4, title: 'Lab Report: Titration', course: 'Organic Chemistry (CHE-301)', dueDate: '2026-10-01T23:59:00', status: 'Submitted', type: 'Lab', points: 50 },
-  { id: 5, title: 'Limits and Continuity Quiz', course: 'Calculus III (MAT-302)', dueDate: '2026-09-28T12:00:00', status: 'Graded', type: 'Quiz', points: 20, score: 18 },
-  { id: 6, title: 'Algorithm Complexity Analysis', course: 'Computer Science (CSC-201)', dueDate: '2026-10-08T23:59:00', status: 'Pending', type: 'Assignment', points: 100 },
-];
+import { useAsync } from '@/modules/superadmin/hooks/useAsync';
+import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
+import { listAssignments, submitAssignment } from '@/modules/student/services/api';
 
 const getStatusStyles = (status: string) => {
   switch (status) {
@@ -36,14 +28,36 @@ const formatDate = (dateString: string) => {
 export default function StudentAssignmentsPage() {
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [submittingId, setSubmittingId] = useState<number | null>(null);
+  const { data, loading, error, reload } = useAsync((signal) => listAssignments(signal), []);
 
   const statuses = ['All', 'Pending', 'Submitted', 'Graded', 'Overdue'];
+
+  if (loading) {
+    return <LoadingBlock rows={5} label="Loading assignments" />;
+  }
+
+  if (error || !data) {
+    return <ErrorBlock message={error ?? 'No data available.'} onRetry={reload} />;
+  }
+
+  const ASSIGNMENTS = data;
 
   const filteredAssignments = ASSIGNMENTS.filter(a => {
     const matchFilter = filter === 'All' || a.status === filter;
     const matchSearch = a.title.toLowerCase().includes(search.toLowerCase()) || a.course.toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchSearch;
   });
+
+  const handleSubmit = async (submissionId: number) => {
+    setSubmittingId(submissionId);
+    try {
+      await submitAssignment(submissionId);
+      reload();
+    } finally {
+      setSubmittingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -135,15 +149,19 @@ export default function StudentAssignmentsPage() {
                 <span className={`px-2.5 py-1 text-[10px] font-black tracking-wider uppercase rounded-md border ${getStatusStyles(assignment.status)}`}>
                   {assignment.status}
                 </span>
-                {assignment.status === 'Graded' && assignment.score !== undefined && (
+                {assignment.status === 'Graded' && assignment.score !== null && (
                   <span className="text-xs font-bold text-zinc-900">Score: {assignment.score} / {assignment.points}</span>
                 )}
               </div>
 
               <div className="w-full sm:w-auto">
                 {assignment.status === 'Pending' || assignment.status === 'Overdue' ? (
-                  <button className="w-full sm:w-auto px-4 py-2 bg-zinc-900 text-white text-xs font-bold rounded-lg hover:bg-[#B81D22] transition-colors shadow-sm">
-                    Submit Work
+                  <button
+                    onClick={() => handleSubmit(assignment.submissionId)}
+                    disabled={submittingId === assignment.submissionId}
+                    className="w-full sm:w-auto px-4 py-2 bg-zinc-900 text-white text-xs font-bold rounded-lg hover:bg-[#B81D22] transition-colors shadow-sm disabled:opacity-60"
+                  >
+                    {submittingId === assignment.submissionId ? 'Submitting…' : 'Submit Work'}
                   </button>
                 ) : (
                   <button className="w-full sm:w-auto px-4 py-2 bg-white text-zinc-700 border border-zinc-200 text-xs font-bold rounded-lg hover:bg-zinc-50 transition-colors shadow-sm">

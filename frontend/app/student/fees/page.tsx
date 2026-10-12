@@ -2,31 +2,26 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-
-// Mock Data
-const FEE_SUMMARY = {
-  totalDue: 2450.00,
-  dueDate: '2026-11-01',
-  totalPaid: 8500.00,
-  term: 'Fall 2026',
-};
-
-const FEE_BREAKDOWN = [
-  { id: 1, description: 'Tuition Fee (Fall 2026)', amount: 4500.00, status: 'Partial', paid: 2500.00, due: 2000.00 },
-  { id: 2, description: 'Lab Equipment Fee', amount: 350.00, status: 'Unpaid', paid: 0.00, due: 350.00 },
-  { id: 3, description: 'Library & Technology Fee', amount: 100.00, status: 'Unpaid', paid: 0.00, due: 100.00 },
-  { id: 4, description: 'Student Union Fee', amount: 50.00, status: 'Paid', paid: 50.00, due: 0.00 },
-];
-
-const PAYMENT_HISTORY = [
-  { id: 101, date: 'Sep 15, 2026', method: 'Credit Card (ends in 4242)', amount: 2500.00, receipt: '#REC-89234' },
-  { id: 102, date: 'Sep 01, 2026', method: 'Bank Transfer', amount: 50.00, receipt: '#REC-89102' },
-  { id: 103, date: 'Jan 10, 2026', method: 'Credit Card (ends in 4242)', amount: 6000.00, receipt: '#REC-77341' },
-];
+import { useAsync } from '@/modules/superadmin/hooks/useAsync';
+import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
+import { getFees } from '@/modules/student/services/api';
 
 export default function StudentFeesPage() {
   const router = useRouter();
-  
+  const { data, loading, error, reload } = useAsync((signal) => getFees(signal), []);
+
+  if (loading) {
+    return <LoadingBlock rows={5} label="Loading fees" />;
+  }
+
+  if (error || !data) {
+    return <ErrorBlock message={error ?? 'No data available.'} onRetry={reload} />;
+  }
+
+  const FEE_SUMMARY = data.summary;
+  const FEE_BREAKDOWN = data.breakdown;
+  const PAYMENT_HISTORY = data.paymentHistory;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -39,8 +34,8 @@ export default function StudentFeesPage() {
             Manage your tuition, view payment history, and pay outstanding balances.
           </p>
         </div>
-        <button 
-          onClick={() => window.location.href = '/student/fees/pay'}
+        <button
+          onClick={() => router.push('/student/fees/pay')}
           className="px-5 py-2.5 bg-[#B81D22] text-white text-sm font-bold rounded-xl hover:bg-[#9E1519] transition-colors shadow-md shadow-red-900/10 flex items-center gap-2 w-max"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
@@ -61,7 +56,9 @@ export default function StudentFeesPage() {
             <p className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">Total Outstanding Due</p>
             <h3 className="text-4xl font-black tracking-tight mb-2">${FEE_SUMMARY.totalDue.toLocaleString('en-US', {minimumFractionDigits: 2})}</h3>
             <p className="text-sm font-medium text-[#B81D22] bg-white/10 w-max px-3 py-1 rounded-lg backdrop-blur-sm">
-              Due by: {new Date(FEE_SUMMARY.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric'})}
+              {FEE_SUMMARY.dueDate
+                ? `Due by: ${new Date(FEE_SUMMARY.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+                : 'No balance due'}
             </p>
           </div>
         </div>

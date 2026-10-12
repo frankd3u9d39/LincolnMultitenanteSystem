@@ -1,30 +1,9 @@
 'use client';
 
 import React from 'react';
-
-// Mock Data
-const OVERALL_ATTENDANCE = {
-  percentage: 92,
-  totalClasses: 120,
-  present: 110,
-  absent: 6,
-  late: 4,
-};
-
-const COURSE_ATTENDANCE = [
-  { id: 1, course: 'Advanced Physics', code: 'PHY-401', percentage: 95, present: 19, total: 20 },
-  { id: 2, course: 'Calculus III', code: 'MAT-302', percentage: 88, present: 22, total: 25 },
-  { id: 3, course: 'Computer Science', code: 'CSC-201', percentage: 100, present: 15, total: 15 },
-  { id: 4, course: 'English Literature', code: 'LIT-105', percentage: 75, present: 9, total: 12 },
-];
-
-const RECENT_LOGS = [
-  { id: 1, date: 'Oct 06, 2026', course: 'Calculus III', status: 'Present' },
-  { id: 2, date: 'Oct 05, 2026', course: 'Advanced Physics', status: 'Present' },
-  { id: 3, date: 'Oct 04, 2026', course: 'English Literature', status: 'Absent' },
-  { id: 4, date: 'Oct 02, 2026', course: 'Computer Science', status: 'Present' },
-  { id: 5, date: 'Oct 01, 2026', course: 'Calculus III', status: 'Late' },
-];
+import { useAsync } from '@/modules/superadmin/hooks/useAsync';
+import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
+import { getAttendance } from '@/modules/student/services/api';
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -36,6 +15,20 @@ const getStatusBadge = (status: string) => {
 };
 
 export default function StudentAttendancePage() {
+  const { data, loading, error, reload } = useAsync((signal) => getAttendance(signal), []);
+
+  if (loading) {
+    return <LoadingBlock rows={5} label="Loading attendance" />;
+  }
+
+  if (error || !data) {
+    return <ErrorBlock message={error ?? 'No data available.'} onRetry={reload} />;
+  }
+
+  const OVERALL_ATTENDANCE = data.overall;
+  const COURSE_ATTENDANCE = data.byCourse;
+  const RECENT_LOGS = data.recentLogs;
+
   return (
     <div className="space-y-6">
       {/* Header */}

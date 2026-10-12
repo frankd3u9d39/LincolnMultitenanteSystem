@@ -1,35 +1,41 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
+import { useAsync } from '@/modules/superadmin/hooks/useAsync';
+import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
+import { getDashboard } from '@/modules/student/services/api';
 
-// Mock Data
-const STUDENT_KPI = {
-  gpa: 3.84,
-  attendance: 96.5,
-  assignmentsDue: 3,
-  unreadNotifications: 2
-};
+/** Derives a class's live status from "HH:MM - HH:MM" against the current time. */
+function classStatus(time: string): 'completed' | 'ongoing' | 'upcoming' {
+  const [startStr, endStr] = time.split(' - ').map((s) => s.trim());
+  const now = new Date();
+  const toMinutes = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return h * 60 + (m ?? 0);
+  };
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const start = toMinutes(startStr);
+  const end = toMinutes(endStr);
 
-const TODAYS_CLASSES = [
-  { id: 1, subject: 'Advanced Physics', time: '09:00 AM - 10:30 AM', room: 'Lab 4B', instructor: 'Dr. Sarah Jenkins', status: 'completed' },
-  { id: 2, subject: 'Calculus III', time: '11:00 AM - 12:30 PM', room: 'Room 302', instructor: 'Prof. David Mercer', status: 'ongoing' },
-  { id: 3, subject: 'Computer Science', time: '02:00 PM - 03:30 PM', room: 'Lab 1A', instructor: 'Alan Turing', status: 'upcoming' },
-];
-
-const RECENT_GRADES = [
-  { id: 1, course: 'Advanced Physics', task: 'Midterm Lab Report', grade: 'A-', score: 92, date: 'Oct 4' },
-  { id: 2, course: 'Calculus III', task: 'Quiz 4: Integration', grade: 'B+', score: 88, date: 'Oct 2' },
-  { id: 3, course: 'Computer Science', task: 'Project 1: Data Structures', grade: 'A', score: 98, date: 'Sep 28' },
-];
-
-const UPCOMING_DEADLINES = [
-  { id: 1, course: 'Computer Science', task: 'Binary Search Trees Assignment', due: 'Tomorrow, 11:59 PM', urgency: 'high' },
-  { id: 2, course: 'Advanced Physics', task: 'Chapter 5 Reading Quiz', due: 'Oct 8, 10:00 AM', urgency: 'medium' },
-  { id: 3, course: 'Literature', task: 'Essay Outline Draft', due: 'Oct 10, 5:00 PM', urgency: 'low' },
-];
+  if (nowMinutes < start) return 'upcoming';
+  if (nowMinutes > end) return 'completed';
+  return 'ongoing';
+}
 
 export default function StudentDashboardPage() {
+  const { data, loading, error, reload } = useAsync((signal) => getDashboard(signal), []);
+
+  if (loading) {
+    return <LoadingBlock rows={6} label="Loading dashboard" />;
+  }
+
+  if (error || !data) {
+    return <ErrorBlock message={error ?? 'No data available.'} onRetry={reload} />;
+  }
+
+  const { kpi, todaysClasses, recentGrades, upcomingDeadlines } = data;
+
   return (
     <div className="space-y-6">
       {/* Top Welcome Header */}
@@ -39,7 +45,7 @@ export default function StudentDashboardPage() {
             Student Portal
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-            Welcome back! Here's your academic overview for today.
+            Welcome back! Here&apos;s your academic overview for today.
           </p>
         </div>
 
@@ -73,15 +79,11 @@ export default function StudentDashboardPage() {
             <div>
               <div className="flex items-center justify-between gap-1.5 mb-2">
                 <span className="font-semibold uppercase tracking-wider text-[11px] text-zinc-500 truncate">Cumulative GPA</span>
-                <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] shrink-0 whitespace-nowrap">
-                  Top 10%
-                </span>
               </div>
-              <div className="text-3xl font-black text-zinc-900 tracking-tight">{STUDENT_KPI.gpa.toFixed(2)}</div>
+              <div className="text-3xl font-black text-zinc-900 tracking-tight">{kpi.gpa.toFixed(2)}</div>
             </div>
             <div className="mt-3 flex items-center justify-between text-[11px] sm:text-xs text-zinc-500 pt-2 border-t border-zinc-100 gap-1">
               <span className="truncate">Out of 4.0 Scale</span>
-              <span className="text-emerald-600 font-bold shrink-0">+0.1 this term</span>
             </div>
           </div>
         </div>
@@ -97,15 +99,8 @@ export default function StudentDashboardPage() {
             <div>
               <div className="flex items-center justify-between gap-1.5 mb-2">
                 <span className="font-semibold uppercase tracking-wider text-[11px] text-zinc-500 truncate">Overall Attendance</span>
-                <span className="font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full text-[10px] shrink-0 whitespace-nowrap">
-                  On Track
-                </span>
               </div>
-              <div className="text-3xl font-black text-zinc-900 tracking-tight">{STUDENT_KPI.attendance}%</div>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-[11px] sm:text-xs text-zinc-500 pt-2 border-t border-zinc-100 gap-1">
-              <span className="truncate">108 / 112 Days Present</span>
-              <span className="font-medium text-zinc-700 shrink-0">4 Absences</span>
+              <div className="text-3xl font-black text-zinc-900 tracking-tight">{kpi.attendance}%</div>
             </div>
           </div>
         </div>
@@ -121,15 +116,8 @@ export default function StudentDashboardPage() {
             <div>
               <div className="flex items-center justify-between gap-1.5 mb-2">
                 <span className="font-semibold uppercase tracking-wider text-[11px] text-zinc-500 truncate">Tasks Due</span>
-                <span className="font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] shrink-0 whitespace-nowrap">
-                  Requires Action
-                </span>
               </div>
-              <div className="text-3xl font-black text-zinc-900 tracking-tight">{STUDENT_KPI.assignmentsDue}</div>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-[11px] sm:text-xs text-zinc-500 pt-2 border-t border-zinc-100 gap-1">
-              <span className="truncate">2 Due this week</span>
-              <span className="text-red-600 font-bold shrink-0">1 Due tomorrow</span>
+              <div className="text-3xl font-black text-zinc-900 tracking-tight">{kpi.assignmentsDue}</div>
             </div>
           </div>
         </div>
@@ -145,15 +133,11 @@ export default function StudentDashboardPage() {
             <div>
               <div className="flex items-center justify-between gap-1.5 mb-2">
                 <span className="font-semibold uppercase tracking-wider text-[11px] text-zinc-500 truncate">Notifications</span>
-                <span className="font-bold text-[#B81D22] bg-red-50 border border-red-200 px-2 py-0.5 rounded-full text-[10px] shrink-0 whitespace-nowrap">
-                  Unread
-                </span>
               </div>
-              <div className="text-3xl font-black text-zinc-900 tracking-tight">{STUDENT_KPI.unreadNotifications}</div>
+              <div className="text-3xl font-black text-zinc-900 tracking-tight">{kpi.unreadNotifications}</div>
             </div>
             <div className="mt-3 flex items-center justify-between text-[11px] sm:text-xs text-zinc-500 pt-2 border-t border-zinc-100 gap-1">
-              <span className="truncate">From Teachers & Admin</span>
-              <span className="text-zinc-600 shrink-0">View Inbox &rarr;</span>
+              <Link href="/student/notifications" className="text-zinc-600 shrink-0 hover:underline">View Inbox &rarr;</Link>
             </div>
           </div>
         </div>
@@ -163,12 +147,12 @@ export default function StudentDashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         {/* Left Column (8 cols) */}
         <div className="xl:col-span-8 space-y-6">
-          
+
           {/* Today's Schedule Table */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-zinc-900">Today's Schedule</h2>
+                <h2 className="text-base font-bold text-zinc-900">Today&apos;s Schedule</h2>
                 <p className="text-xs text-zinc-500">Your upcoming classes and events for today.</p>
               </div>
             </div>
@@ -184,35 +168,41 @@ export default function StudentDashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 text-zinc-700">
-                  {TODAYS_CLASSES.map((cls) => (
-                    <tr key={cls.id} className="hover:bg-zinc-50/60 transition-colors">
-                      <td className="py-3 px-3 whitespace-nowrap">
-                        <div className="font-bold text-zinc-900 truncate max-w-[220px]">{cls.subject}</div>
-                        <div className="text-[11px] text-zinc-500 font-mono flex items-center gap-1.5 mt-0.5">
-                          {cls.room}
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 font-medium whitespace-nowrap">
-                        {cls.instructor}
-                      </td>
-                      <td className="py-3 px-3 text-right font-mono text-[11px] text-zinc-500 whitespace-nowrap">
-                        {cls.time}
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                            cls.status === 'completed'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : cls.status === 'ongoing'
-                              ? 'bg-[#B81D22]/10 text-[#B81D22] border border-[#B81D22]/20'
-                              : 'bg-zinc-100 text-zinc-600 border border-zinc-200'
-                          }`}
-                        >
-                          {cls.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {todaysClasses.length === 0 && (
+                    <tr><td colSpan={4} className="py-6 px-3 text-center text-zinc-400">No classes scheduled today.</td></tr>
+                  )}
+                  {todaysClasses.map((cls) => {
+                    const status = classStatus(cls.time);
+                    return (
+                      <tr key={cls.id} className="hover:bg-zinc-50/60 transition-colors">
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <div className="font-bold text-zinc-900 truncate max-w-[220px]">{cls.subject}</div>
+                          <div className="text-[11px] text-zinc-500 font-mono flex items-center gap-1.5 mt-0.5">
+                            {cls.room}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 font-medium whitespace-nowrap">
+                          {cls.instructor}
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono text-[11px] text-zinc-500 whitespace-nowrap">
+                          {cls.time}
+                        </td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                              status === 'completed'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : status === 'ongoing'
+                                ? 'bg-[#B81D22]/10 text-[#B81D22] border border-[#B81D22]/20'
+                                : 'bg-zinc-100 text-zinc-600 border border-zinc-200'
+                            }`}
+                          >
+                            {status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -241,7 +231,10 @@ export default function StudentDashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 text-zinc-700">
-                  {RECENT_GRADES.map((grade) => (
+                  {recentGrades.length === 0 && (
+                    <tr><td colSpan={4} className="py-6 px-3 text-center text-zinc-400">No grades posted yet.</td></tr>
+                  )}
+                  {recentGrades.map((grade) => (
                     <tr key={grade.id} className="hover:bg-zinc-50/60 transition-colors">
                       <td className="py-3 px-3 whitespace-nowrap">
                         <div className="font-bold text-zinc-900 truncate max-w-[250px]">{grade.task}</div>
@@ -250,11 +243,10 @@ export default function StudentDashboardPage() {
                         {grade.course}
                       </td>
                       <td className="py-3 px-3 text-center text-[11px] text-zinc-500 font-mono whitespace-nowrap">
-                        {grade.date}
+                        {grade.date ?? '—'}
                       </td>
                       <td className="py-3 px-3 text-right whitespace-nowrap">
-                        <div className="font-bold text-zinc-900">{grade.grade}</div>
-                        <div className="text-[10px] text-zinc-400">{grade.score}/100</div>
+                        <div className="text-[10px] text-zinc-400">{grade.score}/{grade.points}</div>
                       </td>
                     </tr>
                   ))}
@@ -267,7 +259,7 @@ export default function StudentDashboardPage() {
 
         {/* Right Column (4 cols) */}
         <div className="xl:col-span-4 space-y-6">
-          
+
           {/* Upcoming Deadlines Feed */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
@@ -278,12 +270,15 @@ export default function StudentDashboardPage() {
             </div>
 
             <div className="space-y-3 text-xs">
-              {UPCOMING_DEADLINES.map((task) => (
-                <div 
-                  key={task.id} 
+              {upcomingDeadlines.length === 0 && (
+                <p className="text-zinc-400 py-4 text-center">Nothing due. You&apos;re all caught up.</p>
+              )}
+              {upcomingDeadlines.map((task) => (
+                <div
+                  key={task.id}
                   className={`p-2.5 rounded-xl border ${
-                    task.urgency === 'high' 
-                      ? 'bg-red-50/50 border-red-100' 
+                    task.urgency === 'high'
+                      ? 'bg-red-50/50 border-red-100'
                       : task.urgency === 'medium'
                       ? 'bg-amber-50/50 border-amber-100'
                       : 'bg-zinc-50 border-zinc-100'
@@ -294,7 +289,7 @@ export default function StudentDashboardPage() {
                       task.urgency === 'high' ? 'text-red-600' :
                       task.urgency === 'medium' ? 'text-amber-600' : 'text-zinc-500'
                     }>{task.course}</span>
-                    <span className="text-zinc-400 font-mono">{task.due}</span>
+                    <span className="text-zinc-400 font-mono">{new Date(task.due).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
                   </div>
                   <div className={`font-semibold ${task.urgency === 'high' ? 'text-red-900' : 'text-zinc-800'}`}>
                     {task.task}
@@ -307,15 +302,15 @@ export default function StudentDashboardPage() {
           {/* Quick Links / Resources */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-4">
             <h3 className="text-sm font-bold text-zinc-900">Quick Links</h3>
-            
+
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <Link href="/student/library" className="p-3 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 transition-colors flex flex-col items-center justify-center gap-2 text-center text-zinc-700 font-medium">
+              <Link href="/student/courses" className="p-3 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 transition-colors flex flex-col items-center justify-center gap-2 text-center text-zinc-700 font-medium">
                 <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
                 </svg>
-                Library
+                My Courses
               </Link>
-              
+
               <Link href="/student/fees" className="p-3 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 transition-colors flex flex-col items-center justify-center gap-2 text-center text-zinc-700 font-medium">
                 <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />

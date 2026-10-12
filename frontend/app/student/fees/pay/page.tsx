@@ -1,22 +1,32 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-
-// Mock Outstanding Fees
-const OUTSTANDING_FEES = [
-  { id: 1, description: 'Tuition Fee (Fall 2026)', due: 2000.00, required: true },
-  { id: 2, description: 'Lab Equipment Fee', due: 350.00, required: false },
-  { id: 3, description: 'Library & Technology Fee', due: 100.00, required: false },
-];
+import { ApiError } from '@/services/api';
+import { listOutstandingFees, payFees, type OutstandingFee } from '@/modules/student/services/api';
 
 export default function PaymentCheckoutPage() {
-  const [selectedFees, setSelectedFees] = useState<number[]>(OUTSTANDING_FEES.map(f => f.id));
+  const [outstandingFees, setOutstandingFees] = useState<OutstandingFee[] | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [selectedFees, setSelectedFees] = useState<number[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [payError, setPayError] = useState('');
+  const [receiptAmount, setReceiptAmount] = useState(0);
+
+  useEffect(() => {
+    listOutstandingFees()
+      .then((fees) => {
+        setOutstandingFees(fees);
+        setSelectedFees(fees.map((f) => f.id));
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Could not load your outstanding fees.'));
+  }, []);
+
+  const OUTSTANDING_FEES = outstandingFees ?? [];
 
   const toggleFee = (id: number) => {
-    setSelectedFees(prev => 
+    setSelectedFees(prev =>
       prev.includes(id) ? prev.filter(fId => fId !== id) : [...prev, id]
     );
   };
@@ -25,15 +35,24 @@ export default function PaymentCheckoutPage() {
     .filter(f => selectedFees.includes(f.id))
     .reduce((sum, f) => sum + f.due, 0);
 
-  const handlePayment = (e: React.FormEvent) => {
+  const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPayError('');
     setIsProcessing(true);
-    // Mock processing delay
-    setTimeout(() => {
-      setIsProcessing(false);
+    try {
+      const result = await payFees(selectedFees);
+      setReceiptAmount(result.amount);
       setIsSuccess(true);
-    }, 2000);
+    } catch (err) {
+      setPayError(err instanceof ApiError ? err.message : 'We could not process this payment. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
+
+  if (loadError) {
+    return <p className="text-sm text-red-700 text-center py-10">{loadError}</p>;
+  }
 
   if (isSuccess) {
     return (
@@ -45,7 +64,7 @@ export default function PaymentCheckoutPage() {
         </div>
         <h1 className="text-3xl font-black text-zinc-900 tracking-tight mb-2">Payment Successful!</h1>
         <p className="text-sm text-zinc-500 mb-8">
-          Thank you. We have received your payment of <strong>${totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}</strong>. A receipt has been sent to your student email.
+          Thank you. We have received your payment of <strong>${receiptAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}</strong>. A receipt has been sent to your student email.
         </p>
         <Link href="/student/fees" className="px-6 py-3 bg-zinc-900 text-white text-sm font-bold rounded-xl hover:bg-zinc-800 transition-colors shadow-sm">
           Return to Fee Status
@@ -130,6 +149,11 @@ export default function PaymentCheckoutPage() {
 
             {/* Payment Details Form */}
             <form onSubmit={handlePayment} className="space-y-4">
+              {payError && (
+                <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800">
+                  {payError}
+                </div>
+              )}
               <div>
                 <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Cardholder Name</label>
                 <input required type="text" placeholder="e.g. Liam Chen" className="w-full px-3 py-2.5 text-sm rounded-xl border border-zinc-200 bg-white text-zinc-800 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] transition-all" />

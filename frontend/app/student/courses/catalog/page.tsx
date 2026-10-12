@@ -2,28 +2,47 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-
-// Mock Data for Available Courses
-const CATALOG_COURSES = [
-  { id: 101, name: 'Introduction to AI', code: 'CSC-301', instructor: 'Dr. Alan Turing', credits: 4, schedule: 'Tue, Thu 09:00 AM', category: 'Computer Science', spots: 5, totalSpots: 30, imageColor: 'bg-indigo-600', isNew: true },
-  { id: 102, name: 'Creative Writing', code: 'LIT-201', instructor: 'Prof. J.R.R. Tolkien', credits: 3, schedule: 'Mon, Wed 02:00 PM', category: 'Arts', spots: 12, totalSpots: 25, imageColor: 'bg-amber-600', isNew: false },
-  { id: 103, name: 'Quantum Mechanics', code: 'PHY-405', instructor: 'Dr. Marie Curie', credits: 4, schedule: 'Fri 10:00 AM', category: 'Physics', spots: 2, totalSpots: 20, imageColor: 'bg-emerald-600', isNew: false },
-  { id: 104, name: 'Microeconomics', code: 'ECO-101', instructor: 'Prof. Adam Smith', credits: 3, schedule: 'Mon, Wed, Fri 01:00 PM', category: 'Economics', spots: 0, totalSpots: 40, imageColor: 'bg-blue-600', isNew: false },
-  { id: 105, name: 'Modern Art History', code: 'ART-305', instructor: 'Dr. Frida Kahlo', credits: 3, schedule: 'Tue, Thu 11:00 AM', category: 'Arts', spots: 8, totalSpots: 25, imageColor: 'bg-rose-600', isNew: true },
-  { id: 106, name: 'Data Structures', code: 'CSC-205', instructor: 'Grace Hopper', credits: 4, schedule: 'Mon, Wed 10:00 AM', category: 'Computer Science', spots: 15, totalSpots: 50, imageColor: 'bg-teal-600', isNew: false },
-];
+import { useAsync } from '@/modules/superadmin/hooks/useAsync';
+import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
+import { enrollInCourse, listCatalog } from '@/modules/student/services/api';
 
 export default function CourseCatalogPage() {
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [enrollingId, setEnrollingId] = useState<number | null>(null);
+  const [notice, setNotice] = useState('');
+  const { data, loading, error, reload } = useAsync((signal) => listCatalog(signal), []);
 
-  const categories = ['All', 'Computer Science', 'Arts', 'Physics', 'Economics'];
+  if (loading) {
+    return <LoadingBlock rows={6} label="Loading catalog" />;
+  }
 
-  const filteredCourses = CATALOG_COURSES.filter(c => {
+  if (error || !data) {
+    return <ErrorBlock message={error ?? 'No data available.'} onRetry={reload} />;
+  }
+
+  const courses = data.map((c) => ({ ...c, imageColor: c.color, isNew: false, category: c.category ?? 'General' }));
+  const categories = ['All', ...Array.from(new Set(courses.map((c) => c.category)))];
+
+  const filteredCourses = courses.filter(c => {
     const matchFilter = filter === 'All' || c.category === filter;
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchSearch;
   });
+
+  const handleEnroll = async (courseId: number) => {
+    setEnrollingId(courseId);
+    setNotice('');
+    try {
+      await enrollInCourse(courseId);
+      setNotice('Enrolled successfully.');
+      reload();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Could not enroll in this course.');
+    } finally {
+      setEnrollingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -76,6 +95,12 @@ export default function CourseCatalogPage() {
         </div>
       </div>
 
+      {notice && (
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-xs font-semibold text-zinc-700">
+          {notice}
+        </div>
+      )}
+
       {/* Course Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredCourses.map(course => (
@@ -123,15 +148,16 @@ export default function CourseCatalogPage() {
                   </span>
                 </div>
                 
-                <button 
-                  disabled={course.spots === 0}
+                <button
+                  disabled={course.spots === 0 || enrollingId === course.id}
+                  onClick={() => handleEnroll(course.id)}
                   className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    course.spots === 0 
+                    course.spots === 0
                       ? 'bg-zinc-100 text-zinc-400 cursor-not-allowed'
-                      : 'bg-zinc-900 text-white hover:bg-[#B81D22] shadow-md shadow-zinc-900/10'
+                      : 'bg-zinc-900 text-white hover:bg-[#B81D22] shadow-md shadow-zinc-900/10 disabled:opacity-60'
                   }`}
                 >
-                  {course.spots === 0 ? 'Waitlist' : 'Enroll'}
+                  {course.spots === 0 ? 'Full' : enrollingId === course.id ? 'Enrolling…' : 'Enroll'}
                 </button>
               </div>
             </div>
@@ -145,7 +171,7 @@ export default function CourseCatalogPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
           </svg>
           <h3 className="text-sm font-bold text-zinc-900">No courses found</h3>
-          <p className="text-xs text-zinc-500 mt-1 max-w-[250px]">We couldn't find any courses matching your current filters or search query.</p>
+          <p className="text-xs text-zinc-500 mt-1 max-w-[250px]">We couldn&apos;t find any courses matching your current filters or search query.</p>
         </div>
       )}
     </div>

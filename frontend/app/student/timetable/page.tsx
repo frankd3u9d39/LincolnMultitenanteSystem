@@ -1,31 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-
-// Mock Data for the week
-const SCHEDULE: Record<string, any[]> = {
-  Monday: [
-    { id: 1, time: '09:00 AM - 10:30 AM', course: 'Advanced Physics (PHY-401)', type: 'Lecture', location: 'Room 304, Science Block', instructor: 'Dr. Sarah Jenkins', color: 'bg-emerald-500' },
-    { id: 2, time: '11:00 AM - 12:30 PM', course: 'Calculus III (MAT-302)', type: 'Lecture', location: 'Hall B, Main Building', instructor: 'Prof. David Mercer', color: 'bg-blue-500' },
-    { id: 3, time: '02:00 PM - 04:00 PM', course: 'Computer Science (CSC-201)', type: 'Lab', location: 'Lab 4, Tech Center', instructor: 'Alan Turing', color: 'bg-indigo-500' },
-  ],
-  Tuesday: [
-    { id: 4, time: '10:00 AM - 11:30 AM', course: 'English Literature (LIT-105)', type: 'Seminar', location: 'Room 102, Arts Wing', instructor: 'Eleanor Vance', color: 'bg-amber-500' },
-    { id: 5, time: '01:00 PM - 02:30 PM', course: 'World History (HIS-204)', type: 'Lecture', location: 'Hall C, Main Building', instructor: 'Dr. Julian Thorne', color: 'bg-rose-500' },
-  ],
-  Wednesday: [
-    { id: 6, time: '09:00 AM - 10:30 AM', course: 'Advanced Physics (PHY-401)', type: 'Lecture', location: 'Room 304, Science Block', instructor: 'Dr. Sarah Jenkins', color: 'bg-emerald-500' },
-    { id: 7, time: '11:00 AM - 12:30 PM', course: 'Calculus III (MAT-302)', type: 'Tutorial', location: 'Room 205, Math Dept', instructor: 'Prof. David Mercer', color: 'bg-blue-500' },
-    { id: 11, time: '02:00 PM - 04:00 PM', course: 'Computer Science (CSC-201)', type: 'Lecture', location: 'Hall D, Tech Center', instructor: 'Alan Turing', color: 'bg-indigo-500' },
-  ],
-  Thursday: [
-    { id: 8, time: '10:00 AM - 11:30 AM', course: 'English Literature (LIT-105)', type: 'Lecture', location: 'Room 102, Arts Wing', instructor: 'Eleanor Vance', color: 'bg-amber-500' },
-    { id: 9, time: '01:00 PM - 04:00 PM', course: 'Organic Chemistry (CHE-301)', type: 'Lab', location: 'Chemistry Lab 2', instructor: 'Dr. Fiona Gallagher', color: 'bg-teal-500' },
-  ],
-  Friday: [
-    { id: 10, time: '08:00 AM - 10:00 AM', course: 'Organic Chemistry (CHE-301)', type: 'Lecture', location: 'Hall A, Science Block', instructor: 'Dr. Fiona Gallagher', color: 'bg-teal-500' },
-  ]
-};
+import { useAsync } from '@/modules/superadmin/hooks/useAsync';
+import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
+import { getTimetable } from '@/modules/student/services/api';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
@@ -33,9 +11,19 @@ export default function StudentTimetablePage() {
   // Try to default to current day if it's a weekday, otherwise Monday
   const currentDayIndex = new Date().getDay();
   const defaultDay = (currentDayIndex >= 1 && currentDayIndex <= 5) ? DAYS[currentDayIndex - 1] : 'Monday';
-  
-  const [selectedDay, setSelectedDay] = useState(defaultDay);
 
+  const [selectedDay, setSelectedDay] = useState(defaultDay);
+  const { data, loading, error, reload } = useAsync((signal) => getTimetable(signal), []);
+
+  if (loading) {
+    return <LoadingBlock rows={5} label="Loading timetable" />;
+  }
+
+  if (error || !data) {
+    return <ErrorBlock message={error ?? 'No data available.'} onRetry={reload} />;
+  }
+
+  const SCHEDULE = data;
   const todaysClasses = SCHEDULE[selectedDay] || [];
 
   return (
@@ -79,12 +67,12 @@ export default function StudentTimetablePage() {
       {/* Schedule Timeline */}
       <div className="bg-white border border-zinc-200 rounded-3xl p-6 sm:p-8 shadow-sm">
         <h2 className="text-lg font-black text-zinc-900 mb-8 border-l-4 border-[#B81D22] pl-3">
-          {selectedDay}'s Schedule
+          {selectedDay}&apos;s Schedule
         </h2>
 
         {todaysClasses.length > 0 ? (
           <div className="relative border-l-2 border-zinc-100 ml-4 space-y-10 pb-4">
-            {todaysClasses.map((cls, idx) => (
+            {todaysClasses.map((cls) => (
               <div key={cls.id} className="relative pl-8 sm:pl-10 group">
                 {/* Timeline Dot */}
                 <span className={`absolute -left-[11px] top-1.5 flex h-5 w-5 items-center justify-center rounded-full ring-4 ring-white ${cls.color}`}>

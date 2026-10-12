@@ -1,31 +1,28 @@
 'use client';
 
 import React from 'react';
-
-// Mock Student Profile Data
-const STUDENT = {
-  name: 'Liam Chen',
-  id: 'STU-2024-8901',
-  email: 'liam.chen@student.lincoln.edu',
-  phone: '+1 (555) 123-4567',
-  dob: 'August 14, 2005',
-  address: '123 Campus Drive, Apt 4B, University City, ST 12345',
-  
-  program: 'B.S. Computer Science',
-  department: 'College of Engineering',
-  enrollmentDate: 'September 1, 2024',
-  expectedGraduation: 'May 2028',
-  advisor: 'Dr. Sarah Jenkins',
-  status: 'Active',
-  
-  emergencyContact: {
-    name: 'Michael Chen',
-    relation: 'Father',
-    phone: '+1 (555) 987-6543',
-  }
-};
+import { useAsync } from '@/modules/superadmin/hooks/useAsync';
+import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
+import { getProfile } from '@/modules/student/services/api';
 
 export default function StudentProfilePage() {
+  const { data, loading, error, reload } = useAsync((signal) => getProfile(signal), []);
+
+  if (loading) {
+    return <LoadingBlock rows={6} label="Loading profile" />;
+  }
+
+  if (error || !data) {
+    return <ErrorBlock message={error ?? 'No data available.'} onRetry={reload} />;
+  }
+
+  const STUDENT = {
+    ...data,
+    dob: data.dob ? new Date(data.dob).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Not set',
+    address: data.address ?? 'Not set',
+    emergencyContact: data.emergencyContact ?? { name: 'Not set', relation: '—', phone: '—' },
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header Profile Card */}
@@ -99,10 +96,6 @@ export default function StudentProfilePage() {
             <div>
               <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Enrollment Date</p>
               <p className="text-sm font-medium text-zinc-900">{STUDENT.enrollmentDate}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Expected Graduation</p>
-              <p className="text-sm font-medium text-zinc-900">{STUDENT.expectedGraduation}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Academic Advisor</p>
