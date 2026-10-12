@@ -2,13 +2,29 @@
 
 import React from 'react';
 import { NavIcon } from '@/components/navigation/NavIcons';
+import { useAsync } from '@/modules/superadmin/hooks/useAsync';
+import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
+import { listClasses } from '@/modules/teacher/services/api';
 
 export default function ClassesPage() {
-  const classes = [
-    { id: 1, name: 'Advanced Mathematics', code: 'MTH301', room: 'Room 402', students: 30, schedule: 'Mon, Wed, Fri (09:00 AM - 10:30 AM)' },
-    { id: 2, name: 'Physics Lab', code: 'PHY201', room: 'Science Lab B', students: 28, schedule: 'Tue, Thu (11:00 AM - 12:30 PM)' },
-    { id: 3, name: 'Introduction to Calculus', code: 'MTH101', room: 'Room 105', students: 40, schedule: 'Mon, Wed, Fri (02:00 PM - 03:30 PM)' },
-  ];
+  const { data, loading, error, reload } = useAsync((signal) => listClasses(signal), []);
+
+  if (loading) {
+    return <LoadingBlock rows={5} label="Loading classes" />;
+  }
+
+  if (error || !data) {
+    return <ErrorBlock message={error ?? 'No data available.'} onRetry={reload} />;
+  }
+
+  const classes = data.map((c) => ({
+    id: c.id,
+    name: c.name,
+    code: c.code,
+    room: c.room ?? 'No room set',
+    students: c.students_count ?? 0,
+    schedule: c.schedule ?? 'No schedule set',
+  }));
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
@@ -18,6 +34,10 @@ export default function ClassesPage() {
           <p className="text-zinc-500 font-medium mt-1">Overview of all classes currently assigned to you.</p>
         </div>
       </div>
+
+      {classes.length === 0 && (
+        <p className="text-sm text-zinc-400">No classes have been assigned to you yet.</p>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {classes.map((cls) => (

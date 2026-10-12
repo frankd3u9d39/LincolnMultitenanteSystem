@@ -1,16 +1,25 @@
 'use client';
 
-import React from 'react';
-import { NavIcon } from '@/components/navigation/NavIcons';
+import React, { useState } from 'react';
+import { useAsync } from '@/modules/superadmin/hooks/useAsync';
+import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
+import { listAllStudents } from '@/modules/teacher/services/api';
 
 export default function StudentsPage() {
-  const students = [
-    { id: 1, name: 'Alice Johnson', idNumber: 'STD-001', email: 'alice.j@student.edu', grade: '10th', attendance: '98%' },
-    { id: 2, name: 'Michael Smith', idNumber: 'STD-002', email: 'michael.s@student.edu', grade: '10th', attendance: '85%' },
-    { id: 3, name: 'Emma Davis', idNumber: 'STD-003', email: 'emma.d@student.edu', grade: '11th', attendance: '95%' },
-    { id: 4, name: 'James Wilson', idNumber: 'STD-004', email: 'james.w@student.edu', grade: '12th', attendance: '92%' },
-    { id: 5, name: 'Sophia Brown', idNumber: 'STD-005', email: 'sophia.b@student.edu', grade: '11th', attendance: '100%' },
-  ];
+  const [search, setSearch] = useState('');
+  const { data, loading, error, reload } = useAsync((signal) => listAllStudents(signal), []);
+
+  if (loading) {
+    return <LoadingBlock rows={6} label="Loading students" />;
+  }
+
+  if (error || !data) {
+    return <ErrorBlock message={error ?? 'No data available.'} onRetry={reload} />;
+  }
+
+  const students = data.filter(
+    (s) => s.user.name.toLowerCase().includes(search.toLowerCase()) || s.user.email.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
@@ -24,9 +33,11 @@ export default function StudentsPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden">
         <div className="p-4 border-b border-zinc-100">
           <div className="relative max-w-md">
-            <input 
-              type="text" 
-              placeholder="Search students..." 
+            <input
+              type="text"
+              placeholder="Search students..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] transition-colors"
             />
             <div className="absolute left-3 top-2.5 text-zinc-400">
@@ -43,39 +54,34 @@ export default function StudentsPage() {
                 <th className="px-6 py-4">Student</th>
                 <th className="px-6 py-4">ID / Email</th>
                 <th className="px-6 py-4">Grade Level</th>
-                <th className="px-6 py-4">Attendance</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4">Classes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
+              {students.length === 0 && (
+                <tr><td colSpan={4} className="px-6 py-8 text-center text-zinc-400">No students found.</td></tr>
+              )}
               {students.map((student) => (
                 <tr key={student.id} className="hover:bg-zinc-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-zinc-200 flex items-center justify-center text-zinc-600 font-bold">
-                        {student.name.charAt(0)}
+                        {student.user.name.charAt(0)}
                       </div>
-                      <div className="font-bold text-zinc-900">{student.name}</div>
+                      <div className="font-bold text-zinc-900">{student.user.name}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm font-semibold text-zinc-800">{student.idNumber}</div>
-                    <div className="text-xs text-zinc-500 mt-0.5">{student.email}</div>
+                    <div className="text-sm font-semibold text-zinc-800">{student.student_id_number ?? '—'}</div>
+                    <div className="text-xs text-zinc-500 mt-0.5">{student.user.email}</div>
                   </td>
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700">
-                      {student.grade}
+                      {student.grade_level ?? 'Not set'}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className={`font-bold ${parseInt(student.attendance) > 90 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                      {student.attendance}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="text-sm font-semibold text-[#B81D22] hover:text-[#9E1519]">
-                      View Profile
-                    </button>
+                  <td className="px-6 py-4 text-sm text-zinc-600">
+                    {student.classNames.join(', ')}
                   </td>
                 </tr>
               ))}

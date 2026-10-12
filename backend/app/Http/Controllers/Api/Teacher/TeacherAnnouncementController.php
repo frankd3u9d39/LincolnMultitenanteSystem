@@ -10,12 +10,11 @@ class TeacherAnnouncementController extends Controller
 {
     public function index(Request $request)
     {
-        $teacherId = 1; // mocked
-        $announcements = Announcement::where('teacher_id', $teacherId)->latest()->get();
+        $announcements = Announcement::where('teacher_id', $request->user()->id)->latest()->get();
 
         return response()->json([
             'status' => 'success',
-            'data' => $announcements
+            'data' => $announcements,
         ]);
     }
 
@@ -28,14 +27,12 @@ class TeacherAnnouncementController extends Controller
             'content' => 'required|string',
         ]);
 
-        $teacherId = 1; // mocked
-        
-        $announcement = Announcement::create(array_merge($validated, ['teacher_id' => $teacherId]));
+        $announcement = Announcement::create(array_merge($validated, ['teacher_id' => $request->user()->id]));
 
         return response()->json([
             'status' => 'success',
             'message' => 'Announcement posted successfully',
-            'data' => $announcement
+            'data' => $announcement,
         ], 201);
     }
 }

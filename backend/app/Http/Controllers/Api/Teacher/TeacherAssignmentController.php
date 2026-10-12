@@ -5,42 +5,77 @@ namespace App\Http\Controllers\Api\Teacher;
 use App\Http\Controllers\Controller;
 use App\Models\Assignment;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class TeacherAssignmentController extends Controller
 {
     public function index(Request $request)
     {
-        $teacherId = 1; // mocked
-        $assignments = Assignment::where('teacher_id', $teacherId)
-                                 ->with('schoolClass')
-                                 ->withCount('submissions')
-                                 ->latest()
-                                 ->get();
+        $assignments = Assignment::where('teacher_id', $request->user()->id)
+            ->with('schoolClass')
+            ->withCount('teacherSubmissions')
+            ->latest()
+            ->get();
 
         return response()->json([
             'status' => 'success',
-            'data' => $assignments
+            'data' => $assignments,
         ]);
     }
 
     public function store(Request $request)
     {
+        $teacherId = $request->user()->id;
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'school_class_id' => 'required|exists:school_classes,id',
+            'school_class_id' => [
+                'required',
+                Rule::exists('school_classes', 'id')->where('teacher_id', $teacherId),
+            ],
             'due_date' => 'required|date',
-            'total_marks' => 'required|integer',
+            'total_marks' => 'required|integer|min:1',
             'instructions' => 'nullable|string',
         ]);
 
-        $teacherId = 1; // mocked
-        
-        $assignment = Assignment::create(array_merge($validated, ['teacher_id' => $teacherId]));
+        $assignment = Assignment::create(array_merge($validated, [
+            'teacher_id' => $teacherId,
+            'school_id' => $request->user()->school_id,
+        ]));
 
         return response()->json([
             'status' => 'success',
             'message' => 'Assignment created successfully',
-            'data' => $assignment
+            'data' => $assignment,
         ], 201);
+    }
+
+    public function show(Request $request, Assignment $assignment)
+    {
+        abort_unless($assignment->teacher_id === $request->user()->id, 404);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $assignment->load('schoolClass', 'teacherSubmissions.student.user'),
+        ]);
+    }
+
+    public function update(Request $request, Assignment $assignment)
+    {
+        abort_unless($assignment->teacher_id === $request->user()->id, 404);
+
+        $validated = $request->validate([
+            'title' => 'sometimes|string|max:255',
+            'due_date' => 'sometimes|date',
+            'total_marks' => 'sometimes|integer|min:1',
+            'instructions' => 'nullable|string',
+        ]);
+
+        $assignment->update($validated);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $assignment,
+        ]);
     }
 }

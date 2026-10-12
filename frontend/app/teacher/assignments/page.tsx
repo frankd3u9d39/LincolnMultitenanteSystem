@@ -3,15 +3,49 @@
 import React, { useState } from 'react';
 import { NavIcon } from '@/components/navigation/NavIcons';
 import { Modal } from '@/components/modals/Modal';
+import { useAsync } from '@/modules/superadmin/hooks/useAsync';
+import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
+import { createAssignment, listAssignments, listClasses } from '@/modules/teacher/services/api';
+import { ApiError } from '@/services/api';
 
 export default function AssignmentsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [classId, setClassId] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [totalMarks, setTotalMarks] = useState('100');
+  const [instructions, setInstructions] = useState('');
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const assignments = [
-    { id: 1, title: 'Calculus Midterm Project', class: 'Advanced Mathematics (MTH301)', dueDate: 'Oct 20, 2026', submitted: 24, total: 30, status: 'Active' },
-    { id: 2, title: 'Physics Lab Report #4', class: 'Physics Lab (PHY201)', dueDate: 'Oct 18, 2026', submitted: 28, total: 28, status: 'Grading' },
-    { id: 3, title: 'Math Worksheet 7', class: 'Introduction to Calculus (MTH101)', dueDate: 'Oct 15, 2026', submitted: 35, total: 40, status: 'Closed' },
-  ];
+  const { data: assignments, loading, error, reload } = useAsync((signal) => listAssignments(signal), []);
+  const { data: classes } = useAsync((signal) => listClasses(signal), []);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+    setSaving(true);
+    try {
+      await createAssignment({
+        title,
+        school_class_id: Number(classId),
+        due_date: dueDate,
+        total_marks: Number(totalMarks),
+        instructions: instructions || undefined,
+      });
+      setTitle('');
+      setClassId('');
+      setDueDate('');
+      setTotalMarks('100');
+      setInstructions('');
+      setIsModalOpen(false);
+      reload();
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : 'Could not create this assignment.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
@@ -20,7 +54,7 @@ export default function AssignmentsPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900">Assignments</h1>
           <p className="text-zinc-500 font-medium mt-1">Manage and grade student assignments.</p>
         </div>
-        <button 
+        <button
           onClick={() => setIsModalOpen(true)}
           className="flex items-center justify-center gap-2 bg-[#B81D22] hover:bg-[#9E1519] text-white px-5 py-2.5 rounded-lg font-semibold transition-all shadow-md"
         >
@@ -29,99 +63,106 @@ export default function AssignmentsPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-zinc-50 text-zinc-500 text-xs uppercase tracking-wider font-semibold">
-                <th className="px-6 py-4">Title & Class</th>
-                <th className="px-6 py-4">Due Date</th>
-                <th className="px-6 py-4">Submissions</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {assignments.map((item) => (
-                <tr key={item.id} className="hover:bg-zinc-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-zinc-900">{item.title}</div>
-                    <div className="text-sm text-zinc-500 mt-1">{item.class}</div>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium text-zinc-700">
-                    {item.dueDate}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 bg-zinc-100 rounded-full overflow-hidden min-w-[80px]">
-                        <div 
-                          className="h-full bg-[#B81D22]" 
-                          style={{ width: `${(item.submitted / item.total) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-bold text-zinc-700 w-12">{item.submitted}/{item.total}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                      item.status === 'Active' ? 'bg-emerald-100 text-emerald-800' :
-                      item.status === 'Grading' ? 'bg-amber-100 text-amber-800' :
-                      'bg-zinc-100 text-zinc-800'
-                    }`}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="text-sm font-semibold text-[#B81D22] hover:text-[#9E1519]">
-                      View Details
-                    </button>
-                  </td>
+      {loading ? (
+        <LoadingBlock rows={5} label="Loading assignments" />
+      ) : error || !assignments ? (
+        <ErrorBlock message={error ?? 'No data available.'} onRetry={reload} />
+      ) : (
+        <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-zinc-50 text-zinc-500 text-xs uppercase tracking-wider font-semibold">
+                  <th className="px-6 py-4">Title & Class</th>
+                  <th className="px-6 py-4">Due Date</th>
+                  <th className="px-6 py-4">Submissions</th>
+                  <th className="px-6 py-4">Total Marks</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {assignments.length === 0 && (
+                  <tr><td colSpan={4} className="px-6 py-8 text-center text-zinc-400">No assignments yet.</td></tr>
+                )}
+                {assignments.map((item) => (
+                  <tr key={item.id} className="hover:bg-zinc-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-zinc-900">{item.title}</div>
+                      <div className="text-sm text-zinc-500 mt-1">{item.school_class?.name ?? '—'}</div>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-zinc-700">
+                      {new Date(item.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+                        {item.teacher_submissions_count ?? 0} submitted
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-semibold text-zinc-700">{item.total_marks}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
-      <Modal 
-        isOpen={isModalOpen} 
+      <Modal
+        isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title="Create New Assignment"
         maxWidth="lg"
       >
-        <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); setIsModalOpen(false); }}>
+        <form className="space-y-5" onSubmit={handleCreate}>
+          {formError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800">{formError}</div>
+          )}
           <div>
             <label className="block text-sm font-bold text-zinc-900 mb-1.5">Assignment Title</label>
-            <input 
-              type="text" 
-              placeholder="e.g. Chapter 4 Quiz" 
+            <input
+              required
+              type="text"
+              placeholder="e.g. Chapter 4 Quiz"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               className="w-full px-4 py-2.5 rounded-lg border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] transition-colors"
             />
           </div>
-          
+
           <div>
             <label className="block text-sm font-bold text-zinc-900 mb-1.5">Select Class</label>
-            <select defaultValue="" className="w-full px-4 py-2.5 rounded-lg border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] transition-colors appearance-none bg-white">
+            <select
+              required
+              value={classId}
+              onChange={(e) => setClassId(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-lg border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] transition-colors appearance-none bg-white"
+            >
               <option value="" disabled>Choose a class...</option>
-              <option value="mth301">Advanced Mathematics (MTH301)</option>
-              <option value="phy201">Physics Lab (PHY201)</option>
-              <option value="mth101">Introduction to Calculus (MTH101)</option>
+              {classes?.map((c) => (
+                <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+              ))}
             </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold text-zinc-900 mb-1.5">Due Date</label>
-              <input 
-                type="date" 
+              <input
+                required
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-lg border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] transition-colors"
               />
             </div>
             <div>
               <label className="block text-sm font-bold text-zinc-900 mb-1.5">Total Marks</label>
-              <input 
+              <input
+                required
                 type="number"
-                placeholder="100" 
+                min={1}
+                placeholder="100"
+                value={totalMarks}
+                onChange={(e) => setTotalMarks(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-lg border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] transition-colors"
               />
             </div>
@@ -129,26 +170,29 @@ export default function AssignmentsPage() {
 
           <div>
             <label className="block text-sm font-bold text-zinc-900 mb-1.5">Instructions</label>
-            <textarea 
+            <textarea
               rows={4}
               placeholder="Provide guidelines for the students..."
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
               className="w-full px-4 py-2.5 rounded-lg border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] transition-colors resize-none"
             />
           </div>
 
           <div className="pt-4 border-t border-zinc-100 flex items-center justify-end gap-3 mt-6">
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => setIsModalOpen(false)}
               className="px-5 py-2.5 rounded-lg font-bold text-zinc-700 hover:bg-zinc-100 transition-colors"
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
-              className="px-5 py-2.5 rounded-lg font-bold bg-[#B81D22] hover:bg-[#9E1519] text-white shadow-md transition-colors"
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-5 py-2.5 rounded-lg font-bold bg-[#B81D22] hover:bg-[#9E1519] text-white shadow-md transition-colors disabled:opacity-60"
             >
-              Create Assignment
+              {saving ? 'Creating…' : 'Create Assignment'}
             </button>
           </div>
         </form>

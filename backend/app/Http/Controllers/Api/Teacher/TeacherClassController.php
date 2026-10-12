@@ -10,12 +10,13 @@ class TeacherClassController extends Controller
 {
     public function index(Request $request)
     {
-        $teacherId = 1; // mocked
-        $classes = SchoolClass::where('teacher_id', $teacherId)->get();
+        $classes = SchoolClass::where('teacher_id', $request->user()->id)
+            ->withCount('students')
+            ->get();
 
         return response()->json([
             'status' => 'success',
-            'data' => $classes
+            'data' => $classes,
         ]);
     }
 }
