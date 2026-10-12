@@ -31,7 +31,10 @@ class DashboardController extends Controller
             ->get()
             ->sum(fn (FeeItem $item) => $item->outstanding());
 
-        $recentAnnouncements = Announcement::whereIn('teacher_id', $teacherIds)
+        // Announcements can be posted by any staff member (admin or teacher), not just teachers.
+        $posterIds = User::where('school_id', $school->id)->pluck('id');
+
+        $recentAnnouncements = Announcement::whereIn('teacher_id', $posterIds)
             ->latest()
             ->limit(5)
             ->get(['id', 'title', 'target_audience', 'is_important', 'created_at'])
