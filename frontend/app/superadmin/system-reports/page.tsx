@@ -263,7 +263,7 @@ export default function SystemReportsPage() {
             <h2 className="text-base font-bold text-zinc-900">Tenant Performance &amp; Utilization Benchmarks</h2>
             <p className="text-xs text-zinc-500">Comparative activity ratings across onboarded institutions.</p>
           </div>
-          <Link href="/schools" className="text-xs font-semibold text-[#B81D22] hover:underline">
+          <Link href="/superadmin/schools" className="text-xs font-semibold text-[#B81D22] hover:underline">
             All Schools &rarr;
           </Link>
         </div>

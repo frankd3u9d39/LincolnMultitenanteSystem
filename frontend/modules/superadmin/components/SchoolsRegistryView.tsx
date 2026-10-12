@@ -37,7 +37,7 @@ export function SchoolsRegistryView() {
 
   const closeInspector = () => {
     setSelectedId(null);
-    if (deepLinkCode) router.replace('/schools');
+    if (deepLinkCode) router.replace('/superadmin/schools');
   };
 
   // Derived rather than seeded into state: the page is statically prerendered with no
@@ -46,7 +46,7 @@ export function SchoolsRegistryView() {
 
   const clearOnboardParam = () => {
     setOnboardOpenedHere(false);
-    if (searchParams.get('onboard')) router.replace('/schools');
+    if (searchParams.get('onboard')) router.replace('/superadmin/schools');
   };
 
   const handleProvision = (draft: OnboardDraft) => {

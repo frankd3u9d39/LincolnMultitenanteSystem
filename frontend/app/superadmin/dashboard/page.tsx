@@ -55,19 +55,19 @@ export default function SuperAdminDashboardPage() {
 
         <div className="flex items-center gap-2.5">
           <Link
-            href="/system-reports"
+            href="/superadmin/system-reports"
             className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm"
           >
             Telemetry Reports
           </Link>
           <Link
-            href="/audit-logs"
+            href="/superadmin/audit-logs"
             className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm"
           >
             Audit Trail
           </Link>
           <Link
-            href="/schools?onboard=1"
+            href="/superadmin/schools?onboard=1"
             className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 flex items-center gap-1.5"
           >
             <span className="text-base leading-none">+</span>
@@ -265,7 +265,7 @@ export default function SuperAdminDashboardPage() {
                     </td>
                     <td className="py-3 px-3 text-right">
                       <Link
-                        href={`/schools?tenant=${school.code}`}
+                        href={`/superadmin/schools?tenant=${school.code}`}
                         className="text-[11px] font-semibold text-[#B81D22] hover:underline"
                       >
                         Manage
@@ -284,7 +284,7 @@ export default function SuperAdminDashboardPage() {
           <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
               <h3 className="text-sm font-bold text-zinc-900">Live Security Feed</h3>
-              <Link href="/audit-logs" className="text-xs font-semibold text-[#B81D22] hover:underline">
+              <Link href="/superadmin/audit-logs" className="text-xs font-semibold text-[#B81D22] hover:underline">
                 View All
               </Link>
             </div>

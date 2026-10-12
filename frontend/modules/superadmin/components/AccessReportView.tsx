@@ -50,7 +50,7 @@ export function AccessReportView() {
       {/* Header */}
       <div className="space-y-3 pb-2 border-b border-zinc-200">
         <Link
-          href="/administrators"
+          href="/superadmin/administrators"
           className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-500 hover:text-[#B81D22] transition-colors"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

@@ -167,7 +167,7 @@ export function AdministratorsView() {
             Export CSV
           </button>
           <Link
-            href="/administrators/access-report"
+            href="/superadmin/administrators/access-report"
             className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm"
           >
             Access Report
