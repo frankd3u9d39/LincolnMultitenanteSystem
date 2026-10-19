@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Announcement;
+use App\Models\StudentNotification;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,6 +44,9 @@ class AnnouncementController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $user = $request->user();
+        $schoolId = $user->school_id ?? $user->school?->id;
+
         $data = $request->validate([
             'title' => ['required', 'string', 'max:150'],
             'content' => ['required', 'string', 'max:5000'],
@@ -55,8 +59,27 @@ class AnnouncementController extends Controller
             'content' => $data['content'],
             'target_audience' => $data['audience'],
             'is_important' => $data['important'] ?? false,
-            'teacher_id' => $request->user()->id,
+            'teacher_id' => $user->id,
         ]);
+
+        // If announcement is for students or both, broadcast in-app notification to all students of this school
+        if ($schoolId && in_array($data['audience'], ['all', 'both', 'students'])) {
+            $students = User::where('school_id', $schoolId)
+                ->where('role', User::ROLE_STUDENT)
+                ->get(['id', 'school_id']);
+
+            $prefix = ($data['important'] ?? false) ? '📢 [Important] ' : '📢 ';
+            foreach ($students as $student) {
+                StudentNotification::create([
+                    'school_id' => $student->school_id ?: $schoolId,
+                    'student_id' => $student->id,
+                    'title' => $prefix . $data['title'],
+                    'message' => $data['content'],
+                    'type' => 'Campus',
+                    'is_read' => false,
+                ]);
+            }
+        }
 
         return response()->json(['data' => ['id' => $announcement->id]], 201);
     }

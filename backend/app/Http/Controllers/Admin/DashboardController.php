@@ -59,6 +59,7 @@ class DashboardController extends Controller
                     'students' => $studentCount,
                     'teachers' => $teacherCount,
                     'classes' => $classCount,
+                    'subjects' => $courseCount,
                     'courses' => $courseCount,
                 ],
                 'outstandingFees' => round($outstandingFees, 2),

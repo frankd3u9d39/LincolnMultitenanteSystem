@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { NavIcon } from '@/components/navigation/NavIcons';
+import React, { useEffect, useSyncExternalStore } from 'react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -11,11 +10,12 @@ interface ModalProps {
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 }
 
+const emptySubscribe = () => () => {};
+
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, maxWidth = 'md' }) => {
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
 
   useEffect(() => {
-    setIsMounted(true);
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {

@@ -23,7 +23,7 @@ export default function AdminDashboardPage() {
     { label: 'Students', value: counts.students, href: '/admin/students', color: 'text-blue-600 bg-blue-50' },
     { label: 'Teachers', value: counts.teachers, href: '/admin/teachers', color: 'text-emerald-600 bg-emerald-50' },
     { label: 'Classes', value: counts.classes, href: '/admin/classes', color: 'text-indigo-600 bg-indigo-50' },
-    { label: 'Courses', value: counts.courses, href: '/admin/courses', color: 'text-amber-600 bg-amber-50' },
+    { label: 'Subjects', value: (counts as any).subjects ?? counts.courses, href: '/admin/subjects', color: 'text-amber-600 bg-amber-50' },
   ];
 
   return (
@@ -64,7 +64,7 @@ export default function AdminDashboardPage() {
             </Link>
           </div>
           <p className="text-4xl font-black text-zinc-900 tracking-tight">
-            ${outstandingFees.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            ₦{outstandingFees.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </p>
           <p className="text-xs text-zinc-500 mt-2">Total unpaid across all students this term.</p>
         </div>

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { homePathFor, safeNextPath, useAuth } from '@/lib/auth';
 import { ApiError } from '@/services/api';
@@ -75,10 +76,13 @@ export default function LoginPage() {
         {/* Top Header / Logo */}
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img
+            <Image
               src="/lincoln-logo.png"
               alt="Lincoln College of Science Management & Technology"
+              width={140}
+              height={48}
               className="h-11 sm:h-12 w-auto object-contain brightness-0 invert"
+              priority
             />
             <div className="h-7 w-px bg-white/30 shrink-0" />
             <span className="font-extrabold text-xs tracking-wider text-[#B81D22] bg-white px-2.5 py-1 rounded-md shadow-sm">

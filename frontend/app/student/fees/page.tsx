@@ -54,7 +54,7 @@ export default function StudentFeesPage() {
           </div>
           <div className="relative z-10">
             <p className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">Total Outstanding Due</p>
-            <h3 className="text-4xl font-black tracking-tight mb-2">${FEE_SUMMARY.totalDue.toLocaleString('en-US', {minimumFractionDigits: 2})}</h3>
+            <h3 className="text-4xl font-black tracking-tight mb-2">₦{FEE_SUMMARY.totalDue.toLocaleString('en-US', {minimumFractionDigits: 2})}</h3>
             <p className="text-sm font-medium text-[#B81D22] bg-white/10 w-max px-3 py-1 rounded-lg backdrop-blur-sm">
               {FEE_SUMMARY.dueDate
                 ? `Due by: ${new Date(FEE_SUMMARY.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
@@ -66,7 +66,7 @@ export default function StudentFeesPage() {
         {/* Other KPIs */}
         <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm flex flex-col justify-center">
           <p className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1">Total Paid This Year</p>
-          <h3 className="text-3xl font-black text-emerald-600 tracking-tight">${FEE_SUMMARY.totalPaid.toLocaleString('en-US', {minimumFractionDigits: 2})}</h3>
+          <h3 className="text-3xl font-black text-emerald-600 tracking-tight">₦{FEE_SUMMARY.totalPaid.toLocaleString('en-US', {minimumFractionDigits: 2})}</h3>
         </div>
         
         <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm flex flex-col justify-center">
@@ -97,9 +97,9 @@ export default function StudentFeesPage() {
                       </span>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-black text-zinc-900">${fee.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
+                      <p className="text-sm font-black text-zinc-900">₦{fee.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
                       {fee.due > 0 && (
-                        <p className="text-xs font-bold text-[#B81D22] mt-0.5">${fee.due.toLocaleString('en-US', {minimumFractionDigits: 2})} due</p>
+                        <p className="text-xs font-bold text-[#B81D22] mt-0.5">₦{fee.due.toLocaleString('en-US', {minimumFractionDigits: 2})} due</p>
                       )}
                     </div>
                   </div>
@@ -107,7 +107,7 @@ export default function StudentFeesPage() {
                   {fee.status === 'Partial' && (
                     <div className="mt-3">
                       <div className="flex justify-between text-[10px] font-bold text-zinc-500 mb-1 uppercase tracking-wider">
-                        <span>Paid: ${fee.paid.toLocaleString()}</span>
+                        <span>Paid: ₦{fee.paid.toLocaleString()}</span>
                         <span>{Math.round((fee.paid / fee.amount) * 100)}%</span>
                       </div>
                       <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden">
@@ -129,7 +129,7 @@ export default function StudentFeesPage() {
               {PAYMENT_HISTORY.map(payment => (
                 <div key={payment.id} className="p-4 sm:p-5 flex items-center justify-between hover:bg-zinc-50 transition-colors">
                   <div className="flex flex-col gap-1">
-                    <p className="text-sm font-bold text-zinc-900">${payment.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
+                    <p className="text-sm font-bold text-zinc-900">₦{payment.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
                     <p className="text-xs text-zinc-500">{payment.method}</p>
                     <p className="text-[10px] text-zinc-400 font-mono">{payment.receipt}</p>
                   </div>

@@ -109,8 +109,8 @@ export default function AdminFeesPage() {
                 <tr key={f.id} className="hover:bg-zinc-50/60">
                   <td className="py-3 px-4 font-bold text-zinc-900">{f.student ?? '—'}</td>
                   <td className="py-3 px-4 text-zinc-600">{f.description}</td>
-                  <td className="py-3 px-4 text-zinc-600">${f.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  <td className="py-3 px-4 text-zinc-600">${f.outstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                  <td className="py-3 px-4 text-zinc-600">₦{f.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                  <td className="py-3 px-4 text-zinc-600">₦{f.outstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                   <td className="py-3 px-4 text-zinc-500 text-xs">{f.dueDate}</td>
                   <td className="py-3 px-4">
                     <span className={`px-2 py-0.5 text-[10px] font-black uppercase rounded-md border ${statusStyles[f.status]}`}>{f.status}</span>

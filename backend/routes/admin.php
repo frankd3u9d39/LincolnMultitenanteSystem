@@ -1,12 +1,21 @@
 <?php
 
 use App\Http\Controllers\Admin\AnnouncementController;
+use App\Http\Controllers\Admin\AttendanceOverviewController;
 use App\Http\Controllers\Admin\ClassController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\DepartmentController;
+use App\Http\Controllers\Admin\ExaminationController;
 use App\Http\Controllers\Admin\FeeController;
+use App\Http\Controllers\Admin\GeneralSettingController;
+use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\ResultOverviewController;
 use App\Http\Controllers\Admin\SchoolSettingController;
+use App\Http\Controllers\Admin\SessionController;
+use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\StudentController;
+use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\TeacherController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,7 +29,8 @@ use Illuminate\Support\Facades\Route;
  *
  * Scope:
  *   - School-level administration: students, teachers, classes, courses,
- *     fee schedules, announcements, and the school's own profile.
+ *     fee schedules, announcements, departments, subjects, sessions,
+ *     attendance, examinations, results, reports, staff, and school profile.
  *
  * Rules:
  *   - Strictly owned by Group 3.
@@ -43,6 +53,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->g
     Route::get('/classes', [ClassController::class, 'index'])->name('classes.index');
     Route::post('/classes', [ClassController::class, 'store'])->name('classes.store');
     Route::put('/classes/{schoolClass}', [ClassController::class, 'update'])->name('classes.update');
+    Route::put('/classes/{schoolClass}/subjects', [ClassController::class, 'syncSubjects'])->name('classes.subjects.update');
 
     Route::get('/courses', [CourseController::class, 'index'])->name('courses.index');
     Route::post('/courses', [CourseController::class, 'store'])->name('courses.store');
@@ -56,4 +67,32 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->g
 
     Route::get('/school-settings', [SchoolSettingController::class, 'show'])->name('settings.show');
     Route::put('/school-settings', [SchoolSettingController::class, 'update'])->name('settings.update');
+
+    // Academic Operations & Administration
+    Route::get('/departments', [DepartmentController::class, 'index'])->name('departments.index');
+    Route::post('/departments', [DepartmentController::class, 'store'])->name('departments.store');
+
+    Route::get('/subjects', [SubjectController::class, 'index'])->name('subjects.index');
+    Route::post('/subjects', [SubjectController::class, 'store'])->name('subjects.store');
+    Route::put('/subjects/{course}', [SubjectController::class, 'update'])->name('subjects.update');
+
+    Route::get('/sessions', [SessionController::class, 'index'])->name('sessions.index');
+    Route::post('/sessions', [SessionController::class, 'store'])->name('sessions.store');
+    Route::post('/sessions/{session}/activate', [SessionController::class, 'activate'])->name('sessions.activate');
+
+    Route::get('/attendance', [AttendanceOverviewController::class, 'index'])->name('attendance.index');
+
+    Route::get('/examinations', [ExaminationController::class, 'index'])->name('examinations.index');
+    Route::post('/examinations', [ExaminationController::class, 'store'])->name('examinations.store');
+    Route::put('/examinations/{assignment}/status', [ExaminationController::class, 'updateStatus'])->name('examinations.status');
+
+    Route::get('/results', [ResultOverviewController::class, 'index'])->name('results.index');
+
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+
+    Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
+    Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
+
+    Route::get('/settings', [GeneralSettingController::class, 'show'])->name('general-settings.show');
+    Route::put('/settings', [GeneralSettingController::class, 'update'])->name('general-settings.update');
 });

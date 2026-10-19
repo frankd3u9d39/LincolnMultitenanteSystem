@@ -5,7 +5,7 @@ import { NavIcon } from '@/components/navigation/NavIcons';
 import Link from 'next/link';
 import { useAsync } from '@/modules/superadmin/hooks/useAsync';
 import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
-import { getDashboard, listAssignments, listClasses } from '@/modules/teacher/services/api';
+import { getDashboard, listAssignments, listClasses, listAnnouncements } from '@/modules/teacher/services/api';
 import { useAuth } from '@/lib/auth';
 
 export default function TeacherDashboard() {
@@ -20,6 +20,7 @@ export default function TeacherDashboard() {
   const { data: dashboard, loading: loadingDashboard, error: dashboardError, reload: reloadDashboard } = useAsync((signal) => getDashboard(signal), []);
   const { data: classes, loading: loadingClasses } = useAsync((signal) => listClasses(signal), []);
   const { data: assignments, loading: loadingAssignments } = useAsync((signal) => listAssignments(signal), []);
+  const { data: notices, loading: loadingNotices } = useAsync((signal) => listAnnouncements(signal), []);
 
   if (loadingDashboard) {
     return <LoadingBlock rows={6} label="Loading dashboard" />;
@@ -81,7 +82,7 @@ export default function TeacherDashboard() {
           >
             <div className="flex justify-between items-start mb-4">
               <div className={`p-3 rounded-lg ${stat.color}`}>
-                <NavIcon name={stat.icon as any} className="w-6 h-6" />
+                <NavIcon name={stat.icon} className="w-6 h-6" />
               </div>
             </div>
             <div>
@@ -215,7 +216,7 @@ export default function TeacherDashboard() {
                   href={action.href}
                   className={`flex flex-col items-center justify-center p-4 rounded-xl transition-colors gap-3 ${action.color}`}
                 >
-                  <NavIcon name={action.icon as any} className="w-6 h-6" />
+                  <NavIcon name={action.icon} className="w-6 h-6" />
                   <span className="text-xs font-bold text-center leading-tight">{action.name}</span>
                 </Link>
               ))}
@@ -234,15 +235,21 @@ export default function TeacherDashboard() {
               </h2>
             </div>
             <div className="p-6 relative z-10 space-y-4">
-              <div className="bg-white/10 p-4 rounded-xl border border-white/20 backdrop-blur-sm">
-                <h4 className="font-bold text-sm mb-1">Faculty Meeting</h4>
-                <p className="text-xs text-white/80 mb-2">Tomorrow at 4:00 PM in the Main Hall.</p>
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-white/20 px-2 py-1 rounded">Mandatory</span>
-              </div>
-              <div className="bg-white/10 p-4 rounded-xl border border-white/20 backdrop-blur-sm">
-                <h4 className="font-bold text-sm mb-1">Midterm Grades Due</h4>
-                <p className="text-xs text-white/80">Please submit all grades by Friday.</p>
-              </div>
+              {loadingNotices && <div className="text-xs text-white/70">Loading notices...</div>}
+              {!loadingNotices && (!notices || notices.length === 0) && (
+                <div className="bg-white/10 p-4 rounded-xl border border-white/20 backdrop-blur-sm">
+                  <p className="text-xs text-white/80">No announcements posted on the notice board yet.</p>
+                </div>
+              )}
+              {notices?.slice(0, 3).map((notice) => (
+                <div key={notice.id} className="bg-white/10 p-4 rounded-xl border border-white/20 backdrop-blur-sm">
+                  <h4 className="font-bold text-sm mb-1">{notice.title}</h4>
+                  <p className="text-xs text-white/80 mb-2">{notice.content}</p>
+                  {notice.is_important && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-white/20 px-2 py-1 rounded">Important</span>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>

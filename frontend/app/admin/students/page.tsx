@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useAsync } from '@/modules/superadmin/hooks/useAsync';
 import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
-import { createStudent, listStudents, updateStudentStatus } from '@/modules/admin/services/api';
+import { createStudent, listClasses, listStudents, updateStudentStatus } from '@/modules/admin/services/api';
 import { ApiError } from '@/services/api';
 
 const statusStyles: Record<string, string> = {
@@ -18,21 +18,29 @@ export default function AdminStudentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [gradeLevel, setGradeLevel] = useState('');
+  const [password, setPassword] = useState('');
+  const [classId, setClassId] = useState('');
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const { data, loading, error, reload } = useAsync((signal) => listStudents(search, signal), [search]);
+  const { data: classesList } = useAsync((signal) => listClasses(signal), []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
     setSaving(true);
     try {
-      await createStudent({ name, email, gradeLevel: gradeLevel || undefined });
+      await createStudent({
+        name,
+        email,
+        classId: classId ? Number(classId) : undefined,
+        password: password || undefined,
+      });
       setName('');
       setEmail('');
-      setGradeLevel('');
+      setPassword('');
+      setClassId('');
       setShowForm(false);
       reload();
     } catch (err) {
@@ -69,7 +77,19 @@ export default function AdminStudentsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input required placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} className="px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200" />
             <input required type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200" />
-            <input placeholder="Grade level (optional)" value={gradeLevel} onChange={(e) => setGradeLevel(e.target.value)} className="px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200 sm:col-span-2" />
+            <input type="password" placeholder="Password (default: Lincoln@123)" value={password} onChange={(e) => setPassword(e.target.value)} className="px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200" />
+            <select
+              value={classId}
+              onChange={(e) => setClassId(e.target.value)}
+              className="px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:border-[#B81D22]"
+            >
+              <option value="">Select Class / Arm (optional)</option>
+              {classesList?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
           </div>
           <button disabled={saving} className="px-4 py-2 rounded-xl bg-zinc-900 text-white text-xs font-bold disabled:opacity-60">
             {saving ? 'Saving…' : 'Add Student'}
@@ -96,7 +116,7 @@ export default function AdminStudentsPage() {
               <tr>
                 <th className="py-2.5 px-4">Name</th>
                 <th className="py-2.5 px-4">Email</th>
-                <th className="py-2.5 px-4">Grade</th>
+                <th className="py-2.5 px-4">Class / Arm</th>
                 <th className="py-2.5 px-4">Joined</th>
                 <th className="py-2.5 px-4">Status</th>
                 <th className="py-2.5 px-4" />
@@ -110,7 +130,7 @@ export default function AdminStudentsPage() {
                 <tr key={s.id} className="hover:bg-zinc-50/60">
                   <td className="py-3 px-4 font-bold text-zinc-900">{s.name}</td>
                   <td className="py-3 px-4 text-zinc-600">{s.email}</td>
-                  <td className="py-3 px-4 text-zinc-600">{s.gradeLevel ?? '—'}</td>
+                  <td className="py-3 px-4 text-zinc-600 font-medium">{s.className ?? s.gradeLevel ?? '—'}</td>
                   <td className="py-3 px-4 text-zinc-500 text-xs">{s.joinedAt}</td>
                   <td className="py-3 px-4">
                     <span className={`px-2 py-0.5 text-[10px] font-black uppercase rounded-md border ${statusStyles[s.status] ?? statusStyles.inactive}`}>

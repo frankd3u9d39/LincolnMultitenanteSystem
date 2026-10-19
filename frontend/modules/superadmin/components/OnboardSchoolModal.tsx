@@ -13,6 +13,7 @@ export interface OnboardDraft {
   storageQuotaGb: number;
   principalAdmin: string;
   principalEmail: string;
+  password?: string;
   activateImmediately: boolean;
 }
 
@@ -26,7 +27,7 @@ interface OnboardSchoolModalProps {
   nextSequence: number;
 }
 
-export type ProvisionErrors = Partial<Record<'name' | 'code' | 'domain' | 'city' | 'principalAdmin' | 'principalEmail' | 'form', string>>;
+export type ProvisionErrors = Partial<Record<'name' | 'code' | 'domain' | 'city' | 'principalAdmin' | 'principalEmail' | 'password' | 'form', string>>;
 
 type FieldErrors = ProvisionErrors;
 
@@ -56,8 +57,10 @@ export function OnboardSchoolModal({
     storageQuotaGb: DEFAULT_RESOURCE_LIMITS.storageQuotaGb,
     principalAdmin: '',
     principalEmail: '',
-    activateImmediately: false,
+    password: '',
+    activateImmediately: true,
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [codeTouched, setCodeTouched] = useState(false);
@@ -94,6 +97,7 @@ export function OnboardSchoolModal({
     if (draft.city.trim().length < 2) next.city = 'Enter the campus city.';
     if (draft.principalAdmin.trim().length < 3) next.principalAdmin = 'Name the principal administrator.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) next.principalEmail = 'Enter a valid administrator email.';
+    if (draft.password && draft.password.length < 8) next.password = 'Enter at least 8 characters.';
 
     return next;
   };
@@ -113,6 +117,7 @@ export function OnboardSchoolModal({
       city: draft.city.trim(),
       principalAdmin: draft.principalAdmin.trim(),
       principalEmail: draft.principalEmail.trim().toLowerCase(),
+      password: draft.password ? draft.password : undefined,
     });
     setSubmitting(false);
 
@@ -228,7 +233,7 @@ export function OnboardSchoolModal({
               {errors.principalAdmin && <p className={errorClass}>{errors.principalAdmin}</p>}
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
               <label className={labelClass} htmlFor="onboard-email">Administrator Email</label>
               <input
                 id="onboard-email"
@@ -239,6 +244,32 @@ export function OnboardSchoolModal({
                 className={inputClass('principalEmail')}
               />
               {errors.principalEmail && <p className={errorClass}>{errors.principalEmail}</p>}
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className={labelClass} htmlFor="onboard-password" style={{ marginBottom: 0 }}>Administrator Password</label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="text-[11px] font-semibold text-[#B81D22] hover:underline"
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              <input
+                id="onboard-password"
+                type={showPassword ? 'text' : 'password'}
+                value={draft.password || ''}
+                onChange={(e) => update('password', e.target.value)}
+                placeholder="Enter password (e.g. password)"
+                className={inputClass('password')}
+              />
+              {errors.password ? (
+                <p className={errorClass}>{errors.password}</p>
+              ) : (
+                <p className="mt-1 text-[11px] text-zinc-400">Password for the admin to sign in (min. 8 characters).</p>
+              )}
             </div>
           </div>
 

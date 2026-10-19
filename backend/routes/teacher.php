@@ -1,11 +1,11 @@
 <?php
 
-use App\Http\Controllers\Api\Teacher\TeacherAnnouncementController;
-use App\Http\Controllers\Api\Teacher\TeacherAssignmentController;
-use App\Http\Controllers\Api\Teacher\TeacherAttendanceController;
-use App\Http\Controllers\Api\Teacher\TeacherClassController;
-use App\Http\Controllers\Api\Teacher\TeacherDashboardController;
-use App\Http\Controllers\Api\Teacher\TeacherStudentController;
+use App\Http\Controllers\Teacher\TeacherAnnouncementController;
+use App\Http\Controllers\Teacher\TeacherAssignmentController;
+use App\Http\Controllers\Teacher\TeacherAttendanceController;
+use App\Http\Controllers\Teacher\TeacherClassController;
+use App\Http\Controllers\Teacher\TeacherDashboardController;
+use App\Http\Controllers\Teacher\TeacherStudentController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -35,6 +35,7 @@ Route::prefix('teacher')->name('teacher.')->middleware(['auth:sanctum', 'teacher
 
     // Attendance
     Route::get('/attendance/classes', [TeacherAttendanceController::class, 'getClasses'])->name('attendance.classes');
+    Route::get('/classes/{schoolClass}/attendance', [TeacherAttendanceController::class, 'records'])->name('attendance.records');
     Route::post('/attendance', [TeacherAttendanceController::class, 'store'])->name('attendance.store');
 
     // Assignments

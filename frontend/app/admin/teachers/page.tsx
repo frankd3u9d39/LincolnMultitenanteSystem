@@ -19,6 +19,7 @@ export default function AdminTeachersPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -29,10 +30,11 @@ export default function AdminTeachersPage() {
     setFormError('');
     setSaving(true);
     try {
-      await createTeacher({ name, email, phone: phone || undefined });
+      await createTeacher({ name, email, phone: phone || undefined, password: password || undefined });
       setName('');
       setEmail('');
       setPhone('');
+      setPassword('');
       setShowForm(false);
       reload();
     } catch (err) {
@@ -69,7 +71,8 @@ export default function AdminTeachersPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input required placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} className="px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200" />
             <input required type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200" />
-            <input placeholder="Phone (optional)" value={phone} onChange={(e) => setPhone(e.target.value)} className="px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200 sm:col-span-2" />
+            <input placeholder="Phone (optional)" value={phone} onChange={(e) => setPhone(e.target.value)} className="px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200" />
+            <input type="password" placeholder="Password (default: Lincoln@123)" value={password} onChange={(e) => setPassword(e.target.value)} className="px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200" />
           </div>
           <button disabled={saving} className="px-4 py-2 rounded-xl bg-zinc-900 text-white text-xs font-bold disabled:opacity-60">
             {saving ? 'Saving…' : 'Add Teacher'}

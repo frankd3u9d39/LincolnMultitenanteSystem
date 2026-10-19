@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useAuth } from '@/lib/auth';
 
 export default function StudentSettingsPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('Account');
   
   const tabs = ['Account', 'Preferences', 'Notifications', 'Security'];
@@ -47,12 +49,12 @@ export default function StudentSettingsPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Primary Email</label>
-                    <input disabled type="email" value="liam.chen@student.lincoln.edu" className="w-full px-4 py-2.5 text-sm rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500 cursor-not-allowed" />
+                    <input disabled type="email" value={user?.email || ''} className="w-full px-4 py-2.5 text-sm rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500 cursor-not-allowed" />
                     <p className="text-[10px] text-zinc-400 mt-1.5">Your primary email cannot be changed. Contact IT support if you need assistance.</p>
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">Recovery Email</label>
-                    <input type="email" placeholder="e.g. liam.chen@gmail.com" className="w-full px-4 py-2.5 text-sm rounded-xl border border-zinc-200 bg-white text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] transition-all" />
+                    <input type="email" placeholder="e.g. personal@example.com" className="w-full px-4 py-2.5 text-sm rounded-xl border border-zinc-200 bg-white text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] transition-all" />
                   </div>
                 </div>
               </div>

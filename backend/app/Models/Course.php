@@ -55,4 +55,11 @@ class Course extends Model
     {
         return max(0, $this->capacity - $this->enrolledCount());
     }
+
+    public function classes()
+    {
+        return $this->belongsToMany(SchoolClass::class, 'class_subject', 'course_id', 'school_class_id')
+            ->withPivot('teacher_id')
+            ->withTimestamps();
+    }
 }

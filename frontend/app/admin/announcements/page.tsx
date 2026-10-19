@@ -55,12 +55,30 @@ export default function AdminAnnouncementsPage() {
           {formError && <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-800">{formError}</div>}
           <input required placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200" />
           <textarea required placeholder="Message" value={content} onChange={(e) => setContent(e.target.value)} rows={4} className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200" />
-          <div className="flex items-center gap-4">
-            <input placeholder="Audience (e.g. all, staff, grade-10)" value={audience} onChange={(e) => setAudience(e.target.value)} className="flex-1 px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200" />
-            <label className="flex items-center gap-2 text-xs font-semibold text-zinc-700">
-              <input type="checkbox" checked={important} onChange={(e) => setImportant(e.target.checked)} />
-              Mark important
-            </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+            <div>
+              <label className="block text-xs font-bold text-zinc-700 mb-1">Target Audience *</label>
+              <select
+                value={audience}
+                onChange={(e) => setAudience(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-zinc-200 bg-white text-zinc-900 focus:outline-none focus:border-[#B81D22]"
+              >
+                <option value="all">Both (Students & Teachers)</option>
+                <option value="students">Students Only</option>
+                <option value="teachers">Teachers Only</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2 sm:pt-5">
+              <label className="flex items-center gap-2 text-xs font-semibold text-zinc-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={important}
+                  onChange={(e) => setImportant(e.target.checked)}
+                  className="rounded border-zinc-300 text-[#B81D22] focus:ring-[#B81D22]"
+                />
+                Mark as High Priority / Important
+              </label>
+            </div>
           </div>
           <button disabled={saving} className="px-4 py-2 rounded-xl bg-zinc-900 text-white text-xs font-bold disabled:opacity-60">
             {saving ? 'Posting…' : 'Post Announcement'}
@@ -83,7 +101,19 @@ export default function AdminAnnouncementsPage() {
               </div>
               <p className="text-sm text-zinc-600 mb-3">{a.content}</p>
               <div className="flex items-center justify-between text-xs text-zinc-400">
-                <span>To: {a.audience} &middot; By {a.postedBy ?? 'Unknown'}</span>
+                <span>
+                  Target:{' '}
+                  <span className="font-semibold text-zinc-700">
+                    {a.audience === 'all' || a.audience === 'both'
+                      ? 'Both (Students & Teachers)'
+                      : a.audience === 'students'
+                      ? 'Students'
+                      : a.audience === 'teachers'
+                      ? 'Teachers'
+                      : a.audience}
+                  </span>{' '}
+                  &middot; By {a.postedBy ?? 'School Administration'}
+                </span>
                 <span>{new Date(a.date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
               </div>
             </div>

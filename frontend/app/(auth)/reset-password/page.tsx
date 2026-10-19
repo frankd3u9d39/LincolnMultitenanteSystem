@@ -2,6 +2,7 @@
 
 import React, { Suspense, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { ApiError } from '@/services/api';
 import { resetPassword } from '@/services/auth';
@@ -63,10 +64,13 @@ function ResetPasswordForm() {
     <main className="min-h-screen flex items-center justify-center bg-zinc-50 px-4 py-10">
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8 shadow-sm">
         <Link href="/login" className="flex items-center gap-3 mb-6">
-          <img
+          <Image
             src="/lincoln-logo.png"
             alt="Lincoln College of Science Management & Technology"
+            width={140}
+            height={40}
             className="h-10 w-auto object-contain"
+            priority
           />
         </Link>
 

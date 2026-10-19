@@ -83,6 +83,7 @@ export interface ProvisionInput {
   city: string;
   principalAdmin: string;
   principalEmail: string;
+  password?: string;
   storageQuotaGb: number;
   activateImmediately: boolean;
 }
@@ -97,6 +98,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<{ tenant: 
       city: input.city,
       principal_admin: input.principalAdmin,
       principal_email: input.principalEmail,
+      password: input.password || undefined,
       storage_quota_gb: input.storageQuotaGb,
       activate_immediately: input.activateImmediately,
     },

@@ -78,12 +78,14 @@ export default function StudentDashboardPage() {
           <div className="relative z-10 flex flex-col justify-between h-full">
             <div>
               <div className="flex items-center justify-between gap-1.5 mb-2">
-                <span className="font-semibold uppercase tracking-wider text-[11px] text-zinc-500 truncate">Cumulative GPA</span>
+                <span className="font-semibold uppercase tracking-wider text-[11px] text-zinc-500 truncate">Academic Average</span>
               </div>
-              <div className="text-3xl font-black text-zinc-900 tracking-tight">{kpi.gpa.toFixed(2)}</div>
+              <div className="text-3xl font-black text-zinc-900 tracking-tight">
+                {Math.min(100, Math.round((kpi.gpa / 4.0) * 100))}%
+              </div>
             </div>
             <div className="mt-3 flex items-center justify-between text-[11px] sm:text-xs text-zinc-500 pt-2 border-t border-zinc-100 gap-1">
-              <span className="truncate">Out of 4.0 Scale</span>
+              <span className="truncate">Current Term Performance</span>
             </div>
           </div>
         </div>

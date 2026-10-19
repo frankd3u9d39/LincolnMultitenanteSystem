@@ -33,20 +33,19 @@ export default function StudentCoursesPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-zinc-200">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight">
-            My Courses
+            My Subjects
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-            Access course materials, assignments, and syllabus.
+            Access subject lesson notes, homework, and term syllabus.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
           <Link
-            href="/student/courses/catalog"
+            href="/student/timetable"
             className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 flex items-center gap-1.5"
           >
-            <span className="text-base leading-none">+</span>
-            <span>Browse Catalog</span>
+            <span>Class Timetable &rarr;</span>
           </Link>
         </div>
       </div>
@@ -116,14 +115,14 @@ export default function StudentCoursesPage() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <svg className="w-3.5 h-3.5 text-zinc-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                  <span className="truncate">{course.credits} Credits</span>
+                  <span className="truncate">{course.credits} Periods/Wk</span>
                 </div>
               </div>
 
               {/* Progress Bar */}
               <div className="mt-auto space-y-1.5">
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                  <span>Course Progress</span>
+                  <span>Subject Progress</span>
                   <span className="text-zinc-700">{course.progress}%</span>
                 </div>
                 <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden">

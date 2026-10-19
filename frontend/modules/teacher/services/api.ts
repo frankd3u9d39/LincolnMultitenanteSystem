@@ -23,14 +23,34 @@ export function getDashboard(signal?: AbortSignal) {
   return api<Envelope<DashboardStats>>('/teacher/dashboard', { signal }).then((r) => r.data);
 }
 
+export interface TeacherClassSubject {
+  id: number;
+  code: string;
+  name: string;
+  department?: string | null;
+  teacher?: string;
+  is_my_subject?: boolean;
+  today_taken?: boolean;
+}
+
 export interface TeacherClass {
   id: number;
   name: string;
   code: string;
   room: string | null;
   schedule: string | null;
-  teacher_id: number;
+  teacher_id?: number | null;
+  teacher?: string;
+  is_form_master?: boolean;
   students_count?: number;
+  today_attendance?: {
+    taken: boolean;
+    total: number;
+    present: number;
+    absent: number;
+    late: number;
+  };
+  subjects?: TeacherClassSubject[];
 }
 
 export function listClasses(signal?: AbortSignal) {
@@ -73,8 +93,44 @@ export async function listAllStudents(signal?: AbortSignal): Promise<Array<Class
 
 export type AttendanceStatus = 'Present' | 'Absent' | 'Late' | 'Excused';
 
-export function takeAttendance(payload: { school_class_id: number; date: string; records: Array<{ student_id: number; status: AttendanceStatus }> }) {
+export function takeAttendance(payload: {
+  school_class_id: number;
+  course_id?: number | null;
+  date: string;
+  records: Array<{ student_id: number; status: AttendanceStatus }>;
+}) {
   return api<Envelope<null>>('/teacher/attendance', { method: 'POST', body: payload });
+}
+
+export interface TeacherAttendanceClassesData {
+  classes: TeacherClass[];
+  teacher_subjects: Array<{ id: number; code: string; name: string; department?: string | null }>;
+  school_subjects: Array<{ id: number; code: string; name: string; department?: string | null }>;
+}
+
+export function listAttendanceClasses(signal?: AbortSignal) {
+  return api<Envelope<TeacherAttendanceClassesData>>('/teacher/attendance/classes', { signal }).then((r) => r.data);
+}
+
+export interface SavedAttendanceRecord {
+  student_id: number;
+  status: AttendanceStatus;
+  type?: string | null;
+  updated_at?: string;
+}
+
+export function getClassAttendance(
+  classId: number,
+  query: { date?: string; course_id?: string | number | null },
+  signal?: AbortSignal
+) {
+  return api<Envelope<SavedAttendanceRecord[]>>(`/teacher/classes/${classId}/attendance`, {
+    query: {
+      date: query.date,
+      course_id: query.course_id !== undefined && query.course_id !== null && query.course_id !== '' ? String(query.course_id) : undefined,
+    },
+    signal,
+  }).then((r) => r.data);
 }
 
 export interface TeacherAssignment {

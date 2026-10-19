@@ -42,6 +42,7 @@ class StoreSchoolRequest extends FormRequest
             'principal_admin' => ['required', 'string', 'min:3', 'max:255'],
             'principal_email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
             'principal_phone' => ['nullable', 'string', 'max:50'],
+            'password' => ['nullable', 'string', 'min:8', 'max:100'],
             'storage_quota_gb' => ['required', 'integer', 'min:1', 'max:10000'],
             'max_students' => ['sometimes', 'integer', 'min:1', 'max:100000'],
             'max_teachers' => ['sometimes', 'integer', 'min:1', 'max:10000'],
@@ -59,6 +60,7 @@ class StoreSchoolRequest extends FormRequest
             'domain.regex' => 'Enter a valid domain, for example school.edu.ng.',
             'domain.unique' => 'This domain is bound to another tenant.',
             'principal_email.unique' => 'An account with this email already exists.',
+            'password.min' => 'The administrator password must be at least 8 characters.',
         ];
     }
 

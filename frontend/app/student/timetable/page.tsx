@@ -26,6 +26,39 @@ export default function StudentTimetablePage() {
   const SCHEDULE = data;
   const todaysClasses = SCHEDULE[selectedDay] || [];
 
+  const handleSyncCalendar = () => {
+    const icsData = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Lincoln College SMTS//Academic Timetable//EN',
+      'CALSCALE:GREGORIAN',
+    ];
+
+    Object.entries(SCHEDULE).forEach(([day, classList]) => {
+      classList.forEach((cls) => {
+        icsData.push(
+          'BEGIN:VEVENT',
+          `SUMMARY:${cls.course} (${cls.location})`,
+          `DESCRIPTION:Day: ${day} | Instructor: ${cls.instructor} | Location: ${cls.location}`,
+          `LOCATION:${cls.location}`,
+          `STATUS:CONFIRMED`,
+          'END:VEVENT'
+        );
+      });
+    });
+
+    icsData.push('END:VCALENDAR');
+
+    const blob = new Blob([icsData.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Lincoln_Academic_Timetable.ics';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -40,9 +73,12 @@ export default function StudentTimetablePage() {
         </div>
         
         <div className="flex items-center gap-2">
-           <button className="px-4 py-2 bg-white border border-zinc-200 text-zinc-700 text-xs font-bold rounded-xl hover:bg-zinc-50 transition-colors shadow-sm flex items-center gap-2">
+           <button
+            onClick={handleSyncCalendar}
+            className="px-4 py-2 bg-white border border-zinc-200 text-zinc-700 text-xs font-bold rounded-xl hover:bg-zinc-50 transition-colors shadow-sm flex items-center gap-2"
+          >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-            Sync Calendar
+            Sync Calendar (.ics)
           </button>
         </div>
       </div>

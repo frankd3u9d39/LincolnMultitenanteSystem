@@ -95,7 +95,7 @@ function GlobalSettingsForm({ initial }: { initial: LoadedAccount }) {
   });
   // The persisted profile and alert preferences; unsaved edits are measured against them.
   const [saved, setSaved] = useState({ profile: initial.overview.profile, notifications: initial.overview.notifications });
-  const [summary, setSummary] = useState(initial.overview.summary);
+  const [summary] = useState(initial.overview.summary);
   const [security, setSecurity] = useState(initial.overview.security);
   const [sessions, setSessions] = useState(initial.sessions);
   const [saving, setSaving] = useState(false);

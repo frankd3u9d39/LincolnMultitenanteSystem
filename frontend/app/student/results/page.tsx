@@ -34,6 +34,43 @@ export default function StudentResultsPage() {
     ? RESULTS_HISTORY
     : RESULTS_HISTORY.filter(r => r.term === selectedTerm);
 
+  const handleDownloadTranscript = () => {
+    const lines = [
+      '==============================================================',
+      'LINCOLN COLLEGE OF SCIENCE MANAGEMENT & TECHNOLOGY',
+      'OFFICIAL ACADEMIC TRANSCRIPT RECORD',
+      '==============================================================',
+      `Cumulative GPA: ${ACADEMIC_SUMMARY.cgpa.toFixed(2)} / 4.00`,
+      `Total Credits Earned: ${ACADEMIC_SUMMARY.totalCredits}`,
+      `Academic Standing: ${ACADEMIC_SUMMARY.standing}`,
+      `Date Issued: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+      '--------------------------------------------------------------',
+      'COURSEWORK & EXAMINATION GRADES BREAKDOWN:',
+      '--------------------------------------------------------------',
+    ];
+
+    for (const termRecord of RESULTS_HISTORY) {
+      const termCredits = termRecord.courses.reduce((sum, c) => sum + c.credits, 0);
+      lines.push(`\n[TERM: ${termRecord.term}] (Term GPA: ${termRecord.tgpa.toFixed(2)}, Credits: ${termCredits})`);
+      for (const c of termRecord.courses) {
+        lines.push(`  - ${c.code.padEnd(10)} ${c.name.padEnd(36)} Grade: ${c.grade.padEnd(4)} Score: ${c.score}% (${c.credits} Credits)`);
+      }
+    }
+
+    lines.push('\n==============================================================');
+    lines.push('END OF OFFICIAL RECORD');
+    lines.push('==============================================================');
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Lincoln_Academic_Transcript_${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -46,7 +83,10 @@ export default function StudentResultsPage() {
             View your academic performance, grades, and transcripts.
           </p>
         </div>
-        <button className="px-4 py-2 bg-zinc-900 text-white text-xs font-bold rounded-xl hover:bg-[#B81D22] transition-colors shadow-sm flex items-center gap-2 w-max">
+        <button
+          onClick={handleDownloadTranscript}
+          className="px-4 py-2 bg-zinc-900 text-white text-xs font-bold rounded-xl hover:bg-[#B81D22] transition-colors shadow-sm flex items-center gap-2 w-max"
+        >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
           Download Transcript
         </button>

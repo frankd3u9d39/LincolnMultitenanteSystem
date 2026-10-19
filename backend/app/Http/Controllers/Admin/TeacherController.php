@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -40,22 +41,35 @@ class TeacherController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $school = $request->user()->school;
+        $school = School::find($request->user()->school_id) ?? $request->user()->school;
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
+            'password' => ['nullable', 'string', 'min:6', 'max:100'],
             'phone' => ['nullable', 'string', 'max:30'],
         ]);
+
+        if ($school->max_teachers) {
+            $currentCount = User::where('school_id', $school->id)->where('role', User::ROLE_TEACHER)->count();
+            if ($currentCount >= $school->max_teachers) {
+                return response()->json([
+                    'message' => 'School teacher staff capacity has been reached (maximum ' . $school->max_teachers . ').',
+                ], 422);
+            }
+        }
+
+        $plainPassword = ! empty($data['password']) ? $data['password'] : 'Lincoln@123';
 
         $teacher = User::create([
             'school_id' => $school->id,
             'name' => $data['name'],
-            'email' => $data['email'],
+            'email' => strtolower($data['email']),
             'phone' => $data['phone'] ?? null,
-            'password' => Hash::make(Str::password(16)),
+            'password' => Hash::make($plainPassword),
             'role' => User::ROLE_TEACHER,
-            'status' => User::STATUS_PENDING,
+            'status' => User::STATUS_ACTIVE,
+            'email_verified_at' => now(),
             'invited_at' => now(),
         ]);
 

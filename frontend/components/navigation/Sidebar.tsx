@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { ROLE_NAVIGATION, UserRole } from '@/constants/navigation';
 import { NavIcon } from './NavIcons';
@@ -17,10 +18,10 @@ interface SidebarProps {
 }
 
 const DEFAULT_USERS: Record<UserRole, { name: string; email: string; initials: string }> = {
-  admin: { name: 'Dr. Sarah Jenkins', email: 's.jenkins@lincoln.edu', initials: 'SJ' },
-  teacher: { name: 'Prof. Marcus Vance', email: 'm.vance@lincoln.edu', initials: 'MV' },
-  student: { name: 'Liam Chen', email: 'l.chen24@lincoln.edu', initials: 'LC' },
-  superadmin: { name: 'Alexander Cross', email: 'admin@lincolnplatform.io', initials: 'AC' },
+  admin: { name: 'Administrator', email: '', initials: 'AD' },
+  teacher: { name: 'Faculty Member', email: '', initials: 'FA' },
+  student: { name: 'Student', email: '', initials: 'ST' },
+  superadmin: { name: 'Super Administrator', email: '', initials: 'SA' },
 };
 
 export function Sidebar({
@@ -42,24 +43,60 @@ export function Sidebar({
       }
     : fallback;
 
-  // The Schools badge reflects the live tenant count rather than a constant.
-  const [activeSchools, setActiveSchools] = useState<number | null>(null);
+  // Badges reflect live database counts rather than constants.
+  const [liveBadges, setLiveBadges] = useState<Record<string, string | number>>({});
 
   useEffect(() => {
-    if (role !== 'superadmin' || !authUser) {
-      return;
-    }
+    if (!authUser) return;
 
     let cancelled = false;
-    api<{ data: { tenants: { active: number } } }>('/superadmin/dashboard')
-      .then((result) => {
-        if (!cancelled) {
-          setActiveSchools(result.data.tenants.active);
-        }
-      })
-      .catch(() => {
-        // The badge is decoration; a failed lookup just leaves it hidden.
-      });
+
+    if (role === 'superadmin') {
+      api<{ data: { tenants: { active: number } } }>('/superadmin/dashboard')
+        .then((result) => {
+          if (!cancelled) {
+            setLiveBadges({ '/superadmin/schools': `${result.data.tenants.active} Active` });
+          }
+        })
+        .catch(() => {});
+    } else if (role === 'admin') {
+      api<{ data: { counts: { students: number; teachers: number; classes: number; courses: number } } }>('/admin/dashboard')
+        .then((result) => {
+          if (!cancelled) {
+            const counts = result.data.counts;
+            setLiveBadges({
+              '/admin/students': counts.students,
+              '/admin/teachers': counts.teachers,
+              '/admin/classes': counts.classes,
+              '/admin/subjects': (counts as any).subjects ?? counts.courses,
+            });
+          }
+        })
+        .catch(() => {});
+    } else if (role === 'teacher') {
+      api<{ data: { total_classes: number; upcoming_assignments: number } }>('/teacher/dashboard')
+        .then((result) => {
+          if (!cancelled) {
+            setLiveBadges({
+              '/teacher/classes': result.data.total_classes,
+              '/teacher/assignments': result.data.upcoming_assignments,
+            });
+          }
+        })
+        .catch(() => {});
+    } else if (role === 'student') {
+      api<{ data: { kpi: { assignmentsDue: number; unreadNotifications: number } } }>('/student/dashboard')
+        .then((result) => {
+          if (!cancelled) {
+            const kpi = result.data.kpi;
+            setLiveBadges({
+              '/student/assignments': kpi.assignmentsDue > 0 ? `${kpi.assignmentsDue} Due` : 0,
+              '/student/notifications': kpi.unreadNotifications,
+            });
+          }
+        })
+        .catch(() => {});
+    }
 
     return () => {
       cancelled = true;
@@ -89,9 +126,11 @@ export function Sidebar({
           <div className="flex items-center gap-3 overflow-hidden">
             {!isCollapsed ? (
               <div className="flex items-center gap-2.5 py-1">
-                <img
+                <Image
                   src="/lincoln-logo.png"
                   alt="Lincoln College of Science Management & Technology"
+                  width={140}
+                  height={40}
                   className="h-10 w-auto object-contain max-w-[170px] brightness-0 invert"
                 />
                 <div className="h-6 w-px bg-white/30 shrink-0" />
@@ -143,7 +182,9 @@ export function Sidebar({
 
               <ul className="space-y-1">
                 {group.items.map((item) => {
-                  const isActive = pathname === item.href;
+                  const isActive =
+                    pathname === item.href ||
+                    (item.href !== `/${role}/dashboard` && pathname.startsWith(`${item.href}/`));
 
                   return (
                     <li key={item.href}>
@@ -172,7 +213,7 @@ export function Sidebar({
                         )}
 
                         {/* Badges */}
-                        {!isCollapsed && (item.href === '/superadmin/schools' ? activeSchools !== null : Boolean(item.badge)) && (
+                        {!isCollapsed && (liveBadges[item.href] !== undefined ? Boolean(liveBadges[item.href]) : Boolean(item.badge)) && (
                           <span
                             className={`ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm ${
                               isActive
@@ -180,7 +221,7 @@ export function Sidebar({
                                 : 'bg-white/25 text-white'
                             }`}
                           >
-                            {item.href === '/superadmin/schools' ? `${activeSchools} Active` : item.badge}
+                            {liveBadges[item.href] !== undefined ? liveBadges[item.href] : item.badge}
                           </span>
                         )}
                       </Link>

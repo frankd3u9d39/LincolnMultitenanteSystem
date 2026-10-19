@@ -48,21 +48,20 @@ class TenantProvisioningService
                 'onboarded_at' => now(),
             ]);
 
-            // The administrator never receives this password directly; it exists
-            // so the account is never left with an empty credential.
-            $temporaryPassword = Str::password(16);
+            $password = !empty($data['password']) ? $data['password'] : Str::password(16);
 
             $administrator = User::create([
                 'school_id' => $school->id,
                 'name' => $data['principal_admin'],
                 'email' => strtolower($data['principal_email']),
-                'password' => Hash::make($temporaryPassword),
+                'password' => Hash::make($password),
                 'role' => User::ROLE_ADMIN,
                 'admin_role' => 'principal_admin',
                 'phone' => $data['principal_phone'] ?? null,
-                'status' => User::STATUS_PENDING,
+                'status' => User::STATUS_ACTIVE,
                 'mfa_enabled' => false,
                 'invited_at' => now(),
+                'password_changed_at' => now(),
             ]);
 
             $this->audit->recordTenantChange(
@@ -86,7 +85,7 @@ class TenantProvisioningService
             return [
                 'school' => $school,
                 'administrator' => $administrator,
-                'temporary_password' => $temporaryPassword,
+                'temporary_password' => $password,
             ];
         });
     }

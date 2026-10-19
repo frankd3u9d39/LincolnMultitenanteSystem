@@ -32,8 +32,8 @@ export function DashboardLayout({ role, children }: DashboardLayoutProps) {
 
       {/* Main Content Area with Top Navbar */}
       <div className="flex flex-1 flex-col min-w-0 bg-white">
-        {/* Top Navbar - Clean & Empty */}
-        <Navbar onMobileMenuToggle={() => setIsMobileOpen(true)} />
+        {/* Top Navbar */}
+        <Navbar role={role} onMobileMenuToggle={() => setIsMobileOpen(true)} />
 
         {/* Page Content Viewport - White Body */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-white text-zinc-900">

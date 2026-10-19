@@ -33,6 +33,7 @@ const PROVISION_FIELDS: Record<string, keyof ProvisionErrors> = {
   city: 'city',
   principal_admin: 'principalAdmin',
   principal_email: 'principalEmail',
+  password: 'password',
   storage_quota_gb: 'form',
 };
 
@@ -87,6 +88,7 @@ export function SchoolsRegistryView() {
         city: draft.city,
         principalAdmin: draft.principalAdmin,
         principalEmail: draft.principalEmail,
+        password: draft.password,
         storageQuotaGb: draft.storageQuotaGb,
         activateImmediately: draft.activateImmediately,
       });

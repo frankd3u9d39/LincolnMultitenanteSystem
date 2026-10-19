@@ -47,22 +47,21 @@ export const ROLE_NAVIGATION: Record<UserRole, RoleNavigationConfig> = {
       {
         label: 'People Management',
         items: [
-          { title: 'Students', href: '/admin/students', iconName: 'students', badge: '1.2k' },
-          { title: 'Teachers', href: '/admin/teachers', iconName: 'teachers', badge: '84' },
+          { title: 'Students', href: '/admin/students', iconName: 'students' },
+          { title: 'Teachers', href: '/admin/teachers', iconName: 'teachers' },
           { title: 'Staff Roster', href: '/admin/staff', iconName: 'users' },
         ],
       },
       {
         label: 'Academic Operations',
         items: [
-          { title: 'Classes', href: '/admin/classes', iconName: 'classes' },
-          { title: 'Departments', href: '/admin/departments', iconName: 'building' },
-          { title: 'Courses', href: '/admin/courses', iconName: 'book' },
-          { title: 'Subjects', href: '/admin/subjects', iconName: 'layers' },
+           { title: 'Subjects', href: '/admin/subjects', iconName: 'layers' },
+          { title: 'Classes & Arms', href: '/admin/classes', iconName: 'classes' },
+          { title: 'Departments & Units', href: '/admin/departments', iconName: 'building' },
           { title: 'Academic Sessions', href: '/admin/sessions', iconName: 'calendar' },
           { title: 'Attendance', href: '/admin/attendance', iconName: 'checkCircle' },
           { title: 'Examinations', href: '/admin/examinations', iconName: 'clipboard' },
-          { title: 'Results', href: '/admin/results', iconName: 'award' },
+          { title: 'Results & Reports', href: '/admin/results', iconName: 'award' },
         ],
       },
       {
@@ -79,7 +78,7 @@ export const ROLE_NAVIGATION: Record<UserRole, RoleNavigationConfig> = {
   teacher: {
     role: 'teacher',
     roleLabel: 'Teacher',
-    roleBadge: 'Teachers',
+    roleBadge: 'Teacher',
     roleColor: {
       bg: 'bg-red-600/15',
       text: 'text-red-500',
@@ -97,7 +96,7 @@ export const ROLE_NAVIGATION: Record<UserRole, RoleNavigationConfig> = {
       {
         label: 'Classroom & Students',
         items: [
-          { title: 'Assigned Classes', href: '/teacher/classes', iconName: 'classes', badge: '4' },
+          { title: 'Assigned Classes', href: '/teacher/classes', iconName: 'classes' },
           { title: 'Student Roster', href: '/teacher/students', iconName: 'students' },
           { title: 'Attendance Roll', href: '/teacher/attendance', iconName: 'checkCircle' },
           { title: 'Timetable', href: '/teacher/timetable', iconName: 'calendar' },
@@ -106,9 +105,9 @@ export const ROLE_NAVIGATION: Record<UserRole, RoleNavigationConfig> = {
       {
         label: 'Academics & Grading',
         items: [
-          { title: 'Assignments', href: '/teacher/assignments', iconName: 'clipboard', badge: '12', badgeVariant: 'primary' },
+          { title: 'Assignments', href: '/teacher/assignments', iconName: 'clipboard' },
           { title: 'Grading & Marks', href: '/teacher/grading', iconName: 'award' },
-          { title: 'Course Materials', href: '/teacher/materials', iconName: 'book' },
+          { title: 'Subject Materials', href: '/teacher/materials', iconName: 'book' },
         ],
       },
       {
@@ -134,8 +133,8 @@ export const ROLE_NAVIGATION: Record<UserRole, RoleNavigationConfig> = {
         label: 'Academic Hub',
         items: [
           { title: 'Dashboard', href: '/student/dashboard', iconName: 'dashboard' },
-          { title: 'My Courses', href: '/student/courses', iconName: 'book', badge: '6' },
-          { title: 'Assignments', href: '/student/assignments', iconName: 'clipboard', badge: '3 Due', badgeVariant: 'primary' },
+          { title: 'My Subjects', href: '/student/courses', iconName: 'book' },
+          { title: 'Assignments', href: '/student/assignments', iconName: 'clipboard' },
           { title: 'Exam Results', href: '/student/results', iconName: 'award' },
           { title: 'Class Timetable', href: '/student/timetable', iconName: 'calendar' },
         ],
@@ -145,7 +144,7 @@ export const ROLE_NAVIGATION: Record<UserRole, RoleNavigationConfig> = {
         items: [
           { title: 'Attendance', href: '/student/attendance', iconName: 'checkCircle' },
           { title: 'Fee Status', href: '/student/fees', iconName: 'creditCard' },
-          { title: 'Notifications', href: '/student/notifications', iconName: 'bell', badge: '2', badgeVariant: 'primary' },
+          { title: 'Notifications', href: '/student/notifications', iconName: 'bell' },
         ],
       },
       {
@@ -179,7 +178,7 @@ export const ROLE_NAVIGATION: Record<UserRole, RoleNavigationConfig> = {
       {
         label: 'Tenant Governance',
         items: [
-          { title: 'Schools (Tenants)', href: '/superadmin/schools', iconName: 'building', badge: '18 Active', badgeVariant: 'primary' },
+          { title: 'Schools (Tenants)', href: '/superadmin/schools', iconName: 'building' },
           { title: 'School Administrators', href: '/superadmin/administrators', iconName: 'users' },
           { title: 'All System Users', href: '/superadmin/system-users', iconName: 'students' },
         ],

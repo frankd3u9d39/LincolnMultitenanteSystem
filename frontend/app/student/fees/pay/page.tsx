@@ -64,7 +64,7 @@ export default function PaymentCheckoutPage() {
         </div>
         <h1 className="text-3xl font-black text-zinc-900 tracking-tight mb-2">Payment Successful!</h1>
         <p className="text-sm text-zinc-500 mb-8">
-          Thank you. We have received your payment of <strong>${receiptAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}</strong>. A receipt has been sent to your student email.
+          Thank you. We have received your payment of <strong>₦{receiptAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}</strong>. A receipt has been sent to your student email.
         </p>
         <Link href="/student/fees" className="px-6 py-3 bg-zinc-900 text-white text-sm font-bold rounded-xl hover:bg-zinc-800 transition-colors shadow-sm">
           Return to Fee Status
@@ -119,7 +119,7 @@ export default function PaymentCheckoutPage() {
                   {fee.required && <p className="text-[10px] uppercase font-bold text-zinc-400 mt-0.5">Required Payment</p>}
                 </div>
                 <p className="text-sm font-black text-zinc-900">
-                  ${fee.due.toLocaleString('en-US', {minimumFractionDigits: 2})}
+                  ₦{fee.due.toLocaleString('en-US', {minimumFractionDigits: 2})}
                 </p>
               </label>
             ))}
@@ -135,7 +135,7 @@ export default function PaymentCheckoutPage() {
               {OUTSTANDING_FEES.filter(f => selectedFees.includes(f.id)).map(fee => (
                 <div key={fee.id} className="flex justify-between text-sm text-zinc-600">
                   <span className="truncate pr-4">{fee.description}</span>
-                  <span className="font-bold text-zinc-900 shrink-0">${fee.due.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                  <span className="font-bold text-zinc-900 shrink-0">₦{fee.due.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
                 </div>
               ))}
             </div>
@@ -143,7 +143,7 @@ export default function PaymentCheckoutPage() {
             <div className="flex justify-between items-end border-t border-zinc-200 pt-4 mb-6">
               <span className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Total Due</span>
               <span className="text-3xl font-black text-[#B81D22] tracking-tight">
-                ${totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}
+                ₦{totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}
               </span>
             </div>
 
@@ -193,7 +193,7 @@ export default function PaymentCheckoutPage() {
                     Processing...
                   </>
                 ) : (
-                  `Pay $${totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}`
+                  `Pay ₦${totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}`
                 )}
               </button>
 
