@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Sidebar } from '@/components/navigation/Sidebar';
 import { Navbar } from '@/components/navigation/Navbar';
 import { UserRole } from '@/constants/navigation';
+import { useAuth } from '@/lib/auth';
 
 interface DashboardLayoutProps {
   role: UserRole;
@@ -12,15 +13,27 @@ interface DashboardLayoutProps {
 
 /**
  * DashboardLayout
- * Red, White, and Black dashboard shell layout.
+ * Dynamic tenant branding dashboard shell layout.
  * Embeds the Sidebar and clean Navbar.
  */
 export function DashboardLayout({ role, children }: DashboardLayoutProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { user } = useAuth();
+
+  const primaryColor = user?.schoolTheme?.primaryColor || '#B81D22';
+  const secondaryColor = user?.schoolTheme?.secondaryColor || '#9E1519';
+  const accentColor = user?.schoolTheme?.accentColor || '#B81D22';
 
   return (
-    <div className="min-h-screen bg-white text-zinc-900 antialiased flex flex-row">
+    <div
+      className="min-h-screen bg-white text-zinc-900 antialiased flex flex-row"
+      style={{
+        ['--school-primary' as any]: primaryColor,
+        ['--school-secondary' as any]: secondaryColor,
+        ['--school-accent' as any]: accentColor,
+      }}
+    >
       {/* Sidebar Navigation */}
       <Sidebar
         role={role}

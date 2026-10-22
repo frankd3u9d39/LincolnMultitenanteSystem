@@ -60,13 +60,17 @@ export default function TeacherDashboard() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3 mt-4 md:mt-0">
+            <Link href="/teacher/grading" className="flex items-center gap-2 bg-white text-[#B81D22] hover:bg-zinc-50 px-4 py-2.5 rounded-lg font-bold transition-all shadow-md">
+              <NavIcon name="award" className="w-5 h-5" />
+              Upload Results File
+            </Link>
+            <Link href="/teacher/attendance" className="flex items-center gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white px-4 py-2.5 rounded-lg font-semibold transition-all shadow-sm">
+              <NavIcon name="checkCircle" className="w-5 h-5" />
+              Attendance
+            </Link>
             <Link href="/teacher/announcements" className="flex items-center gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white px-4 py-2.5 rounded-lg font-semibold transition-all shadow-sm">
               <NavIcon name="bell" className="w-5 h-5" />
               Announcements
-            </Link>
-            <Link href="/teacher/attendance" className="flex items-center gap-2 bg-white text-[#B81D22] hover:bg-zinc-50 px-4 py-2.5 rounded-lg font-bold transition-all shadow-md">
-              <NavIcon name="checkCircle" className="w-5 h-5" />
-              Take Attendance
             </Link>
           </div>
         </div>

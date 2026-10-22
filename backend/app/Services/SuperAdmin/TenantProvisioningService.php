@@ -27,8 +27,19 @@ class TenantProvisioningService
      */
     public function provision(array $data): array
     {
-        return DB::transaction(function () use ($data) {
-            $activateImmediately = (bool) ($data['activate_immediately'] ?? false);
+        $activateImmediately = (bool) ($data['activate_immediately'] ?? false);
+
+        return DB::transaction(function () use ($data, $activateImmediately) {
+            $logoUrl = $data['logo_url'] ?? null;
+            if (isset($data['logo']) && $data['logo'] instanceof \Illuminate\Http\UploadedFile) {
+                $filename = 'logo_' . \Illuminate\Support\Str::slug($data['code']) . '_' . time() . '.' . $data['logo']->getClientOriginalExtension();
+                $targetDir = public_path('uploads/logos');
+                if (! file_exists($targetDir)) {
+                    mkdir($targetDir, 0777, true);
+                }
+                $data['logo']->move($targetDir, $filename);
+                $logoUrl = '/uploads/logos/' . $filename;
+            }
 
             $school = School::create([
                 'name' => $data['name'],
@@ -39,11 +50,17 @@ class TenantProvisioningService
                 'contact_phone' => $data['principal_phone'] ?? null,
                 'city' => $data['city'],
                 'country' => $data['country'] ?? 'Nigeria',
+                'logo_url' => $logoUrl,
+                'primary_color' => $data['primary_color'] ?? '#B81D22',
+                'secondary_color' => $data['secondary_color'] ?? '#9E1519',
+                'accent_color' => $data['accent_color'] ?? '#B81D22',
+                'theme_palette' => $data['theme_palette'] ?? 'crimson',
                 'status' => $activateImmediately ? School::STATUS_ACTIVE : School::STATUS_PENDING,
                 'storage_limit_gb' => $data['storage_quota_gb'],
                 'max_students' => $data['max_students'] ?? 10000,
                 'max_teachers' => $data['max_teachers'] ?? 800,
                 'max_file_upload_mb' => $data['max_file_upload_mb'] ?? 50,
+                'cbt_enabled' => (bool) ($data['cbt_enabled'] ?? false),
                 'storage_used_mb' => 0,
                 'onboarded_at' => now(),
             ]);
@@ -58,7 +75,7 @@ class TenantProvisioningService
                 'role' => User::ROLE_ADMIN,
                 'admin_role' => 'principal_admin',
                 'phone' => $data['principal_phone'] ?? null,
-                'status' => User::STATUS_ACTIVE,
+                'status' => $activateImmediately ? User::STATUS_ACTIVE : User::STATUS_PENDING,
                 'mfa_enabled' => false,
                 'invited_at' => now(),
                 'password_changed_at' => now(),

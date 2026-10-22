@@ -61,9 +61,16 @@ export function Navbar({ role = 'admin', onMobileMenuToggle, className = '' }: N
       ? '/superadmin/audit-logs'
       : `/${role}/announcements`;
 
+  const primaryColor = user?.schoolTheme?.primaryColor || '#B81D22';
+  const secondaryColor = user?.schoolTheme?.secondaryColor || '#9E1519';
+
   return (
     <header
-      className={`sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-[#9E1519] bg-[#B81D22] text-white px-4 sm:px-6 lg:px-8 shadow-sm ${className}`}
+      style={{
+        backgroundColor: primaryColor,
+        borderBottomColor: secondaryColor,
+      }}
+      className={`sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b text-white px-4 sm:px-6 lg:px-8 shadow-sm transition-colors duration-200 ${className}`}
     >
       {/* Left: Mobile Drawer Trigger + Breadcrumb */}
       <div className="flex items-center gap-3">
@@ -106,7 +113,10 @@ export function Navbar({ role = 'admin', onMobileMenuToggle, className = '' }: N
           title="Notifications & Announcements"
         >
           <NavIcon name="bell" className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-[#B81D22]" />
+          <span
+            className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-400 ring-2"
+            style={{ ['--tw-ring-color' as any]: primaryColor }}
+          />
         </Link>
 
         {/* User Mini Identifier */}

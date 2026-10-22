@@ -94,6 +94,12 @@ export interface SchoolTenant {
   principalAdmin: string;
   principalEmail: string;
   city: string;
+  cbtEnabled: boolean;
+  logoUrl?: string | null;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  themePalette?: string;
   onboardedOn: string;
   lastActivity: string;
 }

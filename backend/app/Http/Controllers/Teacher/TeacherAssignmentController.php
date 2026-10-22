@@ -32,7 +32,10 @@ class TeacherAssignmentController extends Controller
             'title' => 'required|string|max:255',
             'school_class_id' => [
                 'required',
-                Rule::exists('school_classes', 'id')->where('school_id', $schoolId),
+                Rule::exists('school_classes', 'id')->where(function ($q) use ($schoolId, $teacherId) {
+                    $q->where('school_id', $schoolId)
+                      ->orWhere('teacher_id', $teacherId);
+                }),
             ],
             'due_date' => 'required|date',
             'total_marks' => 'required|integer|min:1',

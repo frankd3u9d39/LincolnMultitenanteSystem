@@ -359,12 +359,14 @@ export interface ExamRecord {
   invigilator: string;
   format: string;
   duration: string;
+  cbtAccessCode?: string | null;
   status: 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled' | string;
 }
 
 export interface ExamResponse {
   data: ExamRecord[];
-  summary: { totalExams: number; scheduledCount: number; completedCount: number; activeVenues: number };
+  school_cbt_enabled?: boolean;
+  summary: { totalExams: number; scheduledCount: number; completedCount: number; activeVenues: number; cbtExamsCount?: number };
 }
 
 export function listExaminations(signal?: AbortSignal) {
@@ -381,6 +383,7 @@ export function createExamination(payload: {
   invigilator?: string;
   format: string;
   duration: string;
+  cbtAccessCode?: string;
 }) {
   return api<{ data: ExamRecord }>('/admin/examinations', { method: 'POST', body: payload }).then((r) => r.data);
 }
@@ -423,6 +426,129 @@ export interface ResultOverviewResponse {
 
 export function getResultOverview(signal?: AbortSignal) {
   return api<ResultOverviewResponse>('/admin/results', { signal });
+}
+
+export interface ClassStudentResult {
+  student_id: number;
+  student_profile_id?: number;
+  name: string;
+  email: string;
+  student_id_number: string;
+  grade_level?: string;
+  ca_score: number | null;
+  exam_score: number | null;
+  total_score: number | null;
+  grade: string | null;
+  remark: string | null;
+  updated_at?: string | null;
+}
+
+export interface ClassResultsMeta {
+  form_master: string;
+  subject_teacher: string;
+  total_students: number;
+  graded_count: number;
+  pending_count: number;
+  completion_status: 'completed' | 'in_progress' | 'pending' | 'empty';
+  last_updated_at?: string | null;
+}
+
+export interface ClassResultsResponse {
+  class: { id: number; name: string; code: string; room?: string; form_master?: string };
+  subjects: Array<{ id: number; code: string; name: string }>;
+  selected_course_id: number | null;
+  term: string;
+  meta?: ClassResultsMeta;
+  students: ClassStudentResult[];
+}
+
+export function getClassResults(classId: number, courseId?: number, term?: string, signal?: AbortSignal) {
+  const query: Record<string, string | number> = {};
+  if (courseId) query.course_id = courseId;
+  if (term) query.term = term;
+  return api<ClassResultsResponse>(`/admin/classes/${classId}/results`, { signal, query });
+}
+
+export async function downloadClassResultsCsv(
+  classId: number,
+  courseId?: number,
+  term?: string,
+  fileName?: string,
+  format: 'pdf' | 'csv' = 'pdf'
+) {
+  const token = typeof window !== 'undefined'
+    ? window.sessionStorage.getItem('lincoln.token') || window.localStorage.getItem('lincoln.token') || ''
+    : '';
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
+
+  const query = new URLSearchParams();
+  if (courseId) query.set('course_id', String(courseId));
+  if (term) query.set('term', term);
+  query.set('format', format);
+
+  const res = await fetch(`${baseUrl}/admin/classes/${classId}/results/export?${query.toString()}`, {
+    headers: {
+      Accept: format === 'pdf' ? 'application/pdf' : 'text/csv',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to download results broadsheet.');
+  }
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const ext = format === 'pdf' ? 'pdf' : 'csv';
+  a.download = fileName || `Class_${classId}_Results.${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
+export function saveClassResults(classId: number, payload: {
+  course_id: number;
+  term: string;
+  results: Array<{
+    student_id: number;
+    ca_score?: number | null;
+    exam_score?: number | null;
+    remark?: string | null;
+  }>;
+}) {
+  return api<{ message: string; saved_count: number }>(`/admin/classes/${classId}/results`, {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function uploadClassResultsCsv(classId: number, courseId: number, term: string, file: File) {
+  const formData = new FormData();
+  formData.append('course_id', String(courseId));
+  formData.append('term', term);
+  formData.append('file', file);
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
+
+  const res = await fetch(`${baseUrl}/admin/classes/${classId}/results/upload-csv`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to upload CSV file.');
+  }
+
+  return res.json();
 }
 
 export interface SchoolReportData {
@@ -492,6 +618,11 @@ export interface GeneralSettingsData {
     schoolName: string;
     campusCode: string;
     portalTheme: string;
+    logoUrl?: string | null;
+    primaryColor?: string;
+    secondaryColor?: string;
+    accentColor?: string;
+    themePalette?: string;
   };
 }
 
@@ -499,7 +630,41 @@ export function getGeneralSettings(signal?: AbortSignal) {
   return api<{ data: GeneralSettingsData }>('/admin/settings', { signal }).then((r) => r.data);
 }
 
-export function updateGeneralSettings(payload: Partial<GeneralSettingsData['academic'] & GeneralSettingsData['financial']>) {
+export function updateGeneralSettings(payload: Partial<GeneralSettingsData['academic'] & GeneralSettingsData['financial'] & {
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  themePalette?: string;
+  logoUrl?: string;
+}>) {
   return api('/admin/settings', { method: 'PUT', body: payload });
+}
+
+export function uploadSchoolLogo(file: File) {
+  const formData = new FormData();
+  formData.append('logo', file);
+  return api<{ status: string; message: string; data: { logoUrl: string } }>('/admin/settings/logo', {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export function deleteSchoolLogo() {
+  return api<{ status: string; message: string; data: { logoUrl: null } }>('/admin/settings/logo', {
+    method: 'DELETE',
+  });
+}
+
+export function updateSchoolBranding(payload: {
+  primaryColor: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  themePalette?: string;
+  logoUrl?: string;
+}) {
+  return api<{ status: string; message: string; data: GeneralSettingsData['portalBranding'] }>('/admin/settings/branding', {
+    method: 'PUT',
+    body: payload,
+  });
 }
 

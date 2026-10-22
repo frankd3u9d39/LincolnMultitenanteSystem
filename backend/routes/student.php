@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Student\AssignmentController;
 use App\Http\Controllers\Student\AttendanceController;
+use App\Http\Controllers\Student\CbtController;
 use App\Http\Controllers\Student\CourseController;
 use App\Http\Controllers\Student\DashboardController;
 use App\Http\Controllers\Student\FeeController;
@@ -52,4 +53,9 @@ Route::prefix('student')->name('student.')->middleware(['auth:sanctum', 'student
 
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    // Computer-Based Testing (CBT) Portal
+    Route::get('/cbt/exams', [CbtController::class, 'exams'])->name('cbt.exams');
+    Route::post('/cbt/verify-access', [CbtController::class, 'verifyAccess'])->name('cbt.verify-access');
+    Route::post('/cbt/submit', [CbtController::class, 'submitExam'])->name('cbt.submit');
 });

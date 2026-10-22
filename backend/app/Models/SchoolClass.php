@@ -10,12 +10,30 @@ class SchoolClass extends Model
     use HasFactory;
 
     protected $fillable = [
+        'school_id',
         'name',
         'code',
         'room',
         'schedule',
         'teacher_id'
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (SchoolClass $class) {
+            if (!$class->school_id && $class->teacher_id) {
+                $teacher = User::find($class->teacher_id);
+                if ($teacher && $teacher->school_id) {
+                    $class->school_id = $teacher->school_id;
+                }
+            }
+        });
+    }
+
+    public function school()
+    {
+        return $this->belongsTo(School::class);
+    }
 
     public function teacher()
     {

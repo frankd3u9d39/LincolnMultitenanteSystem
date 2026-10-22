@@ -46,6 +46,10 @@ class School extends Model
         'country',
         'postal_code',
         'logo_url',
+        'primary_color',
+        'secondary_color',
+        'accent_color',
+        'theme_palette',
         'status',
         'storage_limit_gb',
         'max_students',
@@ -55,12 +59,14 @@ class School extends Model
         'academic_year_current',
         'timezone',
         'currency',
+        'cbt_enabled',
         'onboarded_at',
     ];
 
     protected function casts(): array
     {
         return [
+            'cbt_enabled' => 'boolean',
             'storage_limit_gb' => 'integer',
             'max_students' => 'integer',
             'max_teachers' => 'integer',

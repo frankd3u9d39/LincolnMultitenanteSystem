@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AnnouncementController;
 use App\Http\Controllers\Admin\AttendanceOverviewController;
 use App\Http\Controllers\Admin\ClassController;
+use App\Http\Controllers\Admin\ClassResultController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DepartmentController;
@@ -87,6 +88,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->g
     Route::put('/examinations/{assignment}/status', [ExaminationController::class, 'updateStatus'])->name('examinations.status');
 
     Route::get('/results', [ResultOverviewController::class, 'index'])->name('results.index');
+    Route::get('/classes/{schoolClass}/results', [ClassResultController::class, 'index'])->name('classes.results.index');
+    Route::post('/classes/{schoolClass}/results', [ClassResultController::class, 'store'])->name('classes.results.store');
+    Route::post('/classes/{schoolClass}/results/upload-csv', [ClassResultController::class, 'uploadCsv'])->name('classes.results.upload-csv');
+    Route::post('/classes/{schoolClass}/results/csv-upload', [ClassResultController::class, 'uploadCsv'])->name('classes.results.csv-upload');
+    Route::get('/classes/{schoolClass}/results/csv-template', [ClassResultController::class, 'csvTemplate'])->name('classes.results.csv-template');
+    Route::get('/classes/{schoolClass}/results/export', [ClassResultController::class, 'export'])->name('classes.results.export');
 
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 
@@ -95,4 +102,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->g
 
     Route::get('/settings', [GeneralSettingController::class, 'show'])->name('general-settings.show');
     Route::put('/settings', [GeneralSettingController::class, 'update'])->name('general-settings.update');
+    Route::post('/settings/logo', [GeneralSettingController::class, 'uploadLogo'])->name('general-settings.logo');
+    Route::delete('/settings/logo', [GeneralSettingController::class, 'deleteLogo'])->name('general-settings.logo.delete');
+    Route::put('/settings/branding', [GeneralSettingController::class, 'updateBranding'])->name('general-settings.branding');
 });

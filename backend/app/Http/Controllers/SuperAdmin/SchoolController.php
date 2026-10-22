@@ -174,4 +174,23 @@ class SchoolController extends Controller
             'data' => new SchoolResource($updated->load(['latestMetric', 'administrators'])),
         ]);
     }
+
+    /** Toggles or sets CBT examination eligibility for a tenant. */
+    public function updateCbt(Request $request, School $school): JsonResponse
+    {
+        $validated = $request->validate([
+            'cbt_enabled' => ['required', 'boolean'],
+        ]);
+
+        $school->update(['cbt_enabled' => $validated['cbt_enabled']]);
+
+        return response()->json([
+            'message' => sprintf(
+                'CBT Examinations %s for %s.',
+                $school->cbt_enabled ? 'enabled' : 'disabled (paper-based only)',
+                $school->name
+            ),
+            'data' => new SchoolResource($school->load(['latestMetric', 'administrators'])),
+        ]);
+    }
 }

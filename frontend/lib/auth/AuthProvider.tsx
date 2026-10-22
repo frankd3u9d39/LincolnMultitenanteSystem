@@ -16,6 +16,8 @@ interface AuthContextValue {
   /** Signs in and returns the signed-in user. Throws ApiError / MfaRequiredError. */
   signIn: (email: string, password: string, options?: { code?: string; remember?: boolean }) => Promise<AuthUser>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<AuthUser | null>;
+  updateUser: (partial: Partial<AuthUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -95,7 +97,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace('/login');
   }, [router]);
 
-  const value = useMemo(() => ({ user, status, endedBy, signIn, signOut }), [user, status, endedBy, signIn, signOut]);
+  const refreshUser = useCallback(async () => {
+    try {
+      const current = await fetchCurrentUser();
+      setUser(current);
+      return current;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const updateUser = useCallback((partial: Partial<AuthUser>) => {
+    setUser((prev) => (prev ? { ...prev, ...partial } : prev));
+  }, []);
+
+  const value = useMemo(
+    () => ({ user, status, endedBy, signIn, signOut, refreshUser, updateUser }),
+    [user, status, endedBy, signIn, signOut, refreshUser, updateUser]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -11,6 +11,7 @@ import {
   provisionTenant,
   reinstateTenant,
   suspendTenant,
+  updateTenantCbt,
 } from '../services/api';
 import { useAsync, useNotice } from '../hooks';
 import { TENANT_STATUS_STYLES, downloadCsv, storageUsagePercent } from '../utils';
@@ -79,6 +80,17 @@ export function SchoolsRegistryView() {
   const replaceTenant = (updated: SchoolTenant) =>
     setData((previous) => (previous ?? []).map((item) => (item.id === updated.id ? updated : item)));
 
+  const handleToggleCbt = async (tenant: SchoolTenant) => {
+    try {
+      const nextState = !tenant.cbtEnabled;
+      const { tenant: updated, message } = await updateTenantCbt(tenant.id, nextState);
+      replaceTenant(updated);
+      notify(message);
+    } catch (err) {
+      notify(failureMessage(err));
+    }
+  };
+
   const handleProvision = async (draft: OnboardDraft): Promise<ProvisionErrors | void> => {
     try {
       const { tenant, message } = await provisionTenant({
@@ -91,6 +103,13 @@ export function SchoolsRegistryView() {
         password: draft.password,
         storageQuotaGb: draft.storageQuotaGb,
         activateImmediately: draft.activateImmediately,
+        cbtEnabled: draft.cbtEnabled,
+        logoFile: draft.logoFile,
+        logoUrl: draft.logoUrl,
+        primaryColor: draft.primaryColor,
+        secondaryColor: draft.secondaryColor,
+        accentColor: draft.accentColor,
+        themePalette: draft.themePalette,
       });
 
       setData((previous) => [tenant, ...(previous ?? [])]);
@@ -327,6 +346,17 @@ export function SchoolsRegistryView() {
                         <span>&bull;</span>
                         <span className="text-zinc-500">{tenant.domain}</span>
                       </div>
+                      <div className="mt-1">
+                        {tenant.cbtEnabled ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            CBT Ready
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-zinc-100 text-zinc-500 border border-zinc-200">
+                            Paper-Only
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3 px-3 text-right">
                       <div className="font-bold text-zinc-900">{tenant.students.toLocaleString()}</div>
@@ -420,6 +450,7 @@ export function SchoolsRegistryView() {
                   ['Principal Administrator', selected.principalAdmin],
                   ['Administrator Email', selected.principalEmail],
                   ['Campus City', selected.city],
+                  ['Examination Mode', selected.cbtEnabled ? 'CBT (Computer-Based) & Paper' : 'Paper-Based Only'],
                   ['Enrolled Students', selected.students.toLocaleString()],
                   ['Faculty & Staff', selected.teachers.toLocaleString()],
                   ['Storage Usage', `${selected.storageUsedGb.toFixed(1)} GB of ${selected.storageQuotaGb.toLocaleString()} GB`],
@@ -449,6 +480,17 @@ export function SchoolsRegistryView() {
                 className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white text-xs font-semibold text-zinc-700 hover:bg-white/60 transition-colors shadow-sm"
               >
                 Adjust Quota
+              </button>
+              <button
+                type="button"
+                onClick={() => handleToggleCbt(selected)}
+                className={`px-3.5 py-2 rounded-xl border text-xs font-semibold transition-colors shadow-sm ${
+                  selected.cbtEnabled
+                    ? 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50'
+                    : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-bold'
+                }`}
+              >
+                {selected.cbtEnabled ? 'Disable CBT Mode' : 'Enable CBT Mode'}
               </button>
               <button
                 type="button"

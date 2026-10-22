@@ -65,6 +65,7 @@ class ExaminationController extends Controller
             $invigilatorVal = $meta['invigilator'] ?? ($a->course?->teacher?->name ?? 'Unassigned');
             $formatVal = $meta['format'] ?? 'Theory & Objective (Paper-Based)';
             $durationVal = $meta['duration'] ?? '2.0 Hours';
+            $cbtAccessCode = $meta['cbt_access_code'] ?? null;
 
             return [
                 'id' => $a->id,
@@ -78,17 +79,20 @@ class ExaminationController extends Controller
                 'invigilator' => $invigilatorVal,
                 'format' => $formatVal,
                 'duration' => $durationVal,
+                'cbtAccessCode' => $cbtAccessCode,
                 'status' => $status,
             ];
         });
 
         return response()->json([
             'data' => $exams->values(),
+            'school_cbt_enabled' => (bool) $school->cbt_enabled,
             'summary' => [
                 'totalExams' => $exams->count(),
                 'scheduledCount' => $exams->where('status', 'Scheduled')->count(),
                 'completedCount' => $exams->where('status', 'Completed')->count(),
                 'activeVenues' => $exams->pluck('venue')->unique()->count(),
+                'cbtExamsCount' => $exams->filter(fn ($e) => str_contains($e['format'], 'CBT'))->count(),
             ],
         ]);
     }
@@ -107,7 +111,21 @@ class ExaminationController extends Controller
             'invigilator' => ['nullable', 'string', 'max:120'],
             'format' => ['required', 'string', 'max:100'],
             'duration' => ['required', 'string', 'max:60'],
+            'cbtAccessCode' => ['nullable', 'string', 'max:30'],
         ]);
+
+        $isCbt = str_contains($data['format'], 'CBT');
+
+        if ($isCbt && ! $school->cbt_enabled) {
+            return response()->json([
+                'message' => 'CBT examinations are disabled for this institution. The platform SuperAdmin registered this school as Paper-Based Only due to computer facility capacity.',
+            ], 422);
+        }
+
+        $cbtCode = null;
+        if ($isCbt) {
+            $cbtCode = !empty($data['cbtAccessCode']) ? strtoupper(trim($data['cbtAccessCode'])) : ('CBT-' . rand(10000, 99999));
+        }
 
         $course = Course::where('school_id', $school->id)->where('code', $data['courseCode'])->first();
         if (! $course) {
@@ -129,6 +147,7 @@ class ExaminationController extends Controller
             'format' => $data['format'],
             'duration' => $data['duration'],
             'invigilator' => $invigilatorName,
+            'cbt_access_code' => $cbtCode,
             'status' => 'Scheduled',
         ];
 
@@ -161,6 +180,7 @@ class ExaminationController extends Controller
                 'invigilator' => $invigilatorName,
                 'format' => $data['format'],
                 'duration' => $data['duration'],
+                'cbtAccessCode' => $cbtCode,
                 'status' => 'Scheduled',
             ],
         ], 201);

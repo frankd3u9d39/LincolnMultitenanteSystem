@@ -201,6 +201,13 @@ class AuthController extends Controller
             'schoolId' => $user->school_id,
             'schoolName' => $user->school?->name,
             'schoolCode' => $user->school?->code,
+            'schoolLogo' => $user->school?->logo_url,
+            'schoolTheme' => [
+                'primaryColor' => $user->school?->primary_color ?? '#B81D22',
+                'secondaryColor' => $user->school?->secondary_color ?? '#9E1519',
+                'accentColor' => $user->school?->accent_color ?? '#B81D22',
+                'themePalette' => $user->school?->theme_palette ?? 'crimson',
+            ],
             'mfaEnabled' => (bool) $user->mfa_enabled,
         ];
     }

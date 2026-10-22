@@ -49,6 +49,12 @@ interface TenantDto {
   teachers: number;
   storageUsedGb: number;
   storageQuotaGb: number;
+  cbtEnabled?: boolean;
+  logoUrl?: string | null;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  themePalette?: string;
   onboardedOn: string | null;
   lastActivity: string;
 }
@@ -64,6 +70,12 @@ function mapTenant(dto: TenantDto): SchoolTenant {
     teachers: dto.teachers,
     storageUsedGb: dto.storageUsedGb,
     storageQuotaGb: dto.storageQuotaGb,
+    cbtEnabled: Boolean(dto.cbtEnabled),
+    logoUrl: dto.logoUrl,
+    primaryColor: dto.primaryColor ?? '#B81D22',
+    secondaryColor: dto.secondaryColor ?? '#9E1519',
+    accentColor: dto.accentColor ?? '#B81D22',
+    themePalette: dto.themePalette ?? 'crimson',
     principalAdmin: dto.principalAdmin ?? '—',
     principalEmail: dto.principalEmail ?? '—',
     city: dto.city ?? '—',
@@ -86,12 +98,38 @@ export interface ProvisionInput {
   password?: string;
   storageQuotaGb: number;
   activateImmediately: boolean;
+  cbtEnabled?: boolean;
+  logoUrl?: string | null;
+  logoFile?: File | null;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  themePalette?: string;
 }
 
 export async function provisionTenant(input: ProvisionInput): Promise<{ tenant: SchoolTenant; message: string }> {
-  const result = await api<{ message: string; data: TenantDto }>('/superadmin/schools', {
-    method: 'POST',
-    body: {
+  let bodyPayload: BodyInit | Record<string, unknown>;
+
+  if (input.logoFile) {
+    const formData = new FormData();
+    formData.append('name', input.name);
+    formData.append('code', input.code);
+    formData.append('domain', input.domain);
+    formData.append('city', input.city);
+    formData.append('principal_admin', input.principalAdmin);
+    formData.append('principal_email', input.principalEmail);
+    if (input.password) formData.append('password', input.password);
+    formData.append('storage_quota_gb', String(input.storageQuotaGb));
+    formData.append('activate_immediately', input.activateImmediately ? '1' : '0');
+    formData.append('cbt_enabled', input.cbtEnabled ? '1' : '0');
+    formData.append('logo', input.logoFile);
+    if (input.primaryColor) formData.append('primary_color', input.primaryColor);
+    if (input.secondaryColor) formData.append('secondary_color', input.secondaryColor);
+    if (input.accentColor) formData.append('accent_color', input.accentColor);
+    if (input.themePalette) formData.append('theme_palette', input.themePalette);
+    bodyPayload = formData;
+  } else {
+    bodyPayload = {
       name: input.name,
       code: input.code,
       domain: input.domain,
@@ -101,7 +139,18 @@ export async function provisionTenant(input: ProvisionInput): Promise<{ tenant: 
       password: input.password || undefined,
       storage_quota_gb: input.storageQuotaGb,
       activate_immediately: input.activateImmediately,
-    },
+      cbt_enabled: Boolean(input.cbtEnabled),
+      logo_url: input.logoUrl || undefined,
+      primary_color: input.primaryColor || undefined,
+      secondary_color: input.secondaryColor || undefined,
+      accent_color: input.accentColor || undefined,
+      theme_palette: input.themePalette || undefined,
+    };
+  }
+
+  const result = await api<{ message: string; data: TenantDto }>('/superadmin/schools', {
+    method: 'POST',
+    body: bodyPayload as any,
   });
 
   return { tenant: mapTenant(result.data), message: result.message };
@@ -111,6 +160,9 @@ async function tenantAction(path: string, method: 'POST' | 'PATCH', body?: Json)
   const result = await api<{ message: string; data: TenantDto }>(path, { method, body });
   return { tenant: mapTenant(result.data), message: result.message };
 }
+
+export const updateTenantCbt = (id: number, cbtEnabled: boolean) =>
+  tenantAction(`/superadmin/schools/${id}/cbt`, 'PATCH', { cbt_enabled: cbtEnabled });
 
 export const changeTenantQuota = (id: number, storageQuotaGb: number) =>
   tenantAction(`/superadmin/schools/${id}/quota`, 'PATCH', { storage_quota_gb: storageQuotaGb });

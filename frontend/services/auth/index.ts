@@ -4,6 +4,13 @@
 import { api, ApiError } from '@/services/api/client';
 import type { SessionRole } from '@/lib/auth/session';
 
+export interface SchoolTheme {
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  themePalette: string;
+}
+
 export interface AuthUser {
   id: number;
   name: string;
@@ -12,6 +19,8 @@ export interface AuthUser {
   schoolId: number | null;
   schoolName: string | null;
   schoolCode: string | null;
+  schoolLogo?: string | null;
+  schoolTheme?: SchoolTheme | null;
   mfaEnabled: boolean;
 }
 

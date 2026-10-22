@@ -53,7 +53,12 @@ export default function StudentResultsPage() {
       const termCredits = termRecord.courses.reduce((sum, c) => sum + c.credits, 0);
       lines.push(`\n[TERM: ${termRecord.term}] (Term GPA: ${termRecord.tgpa.toFixed(2)}, Credits: ${termCredits})`);
       for (const c of termRecord.courses) {
-        lines.push(`  - ${c.code.padEnd(10)} ${c.name.padEnd(36)} Grade: ${c.grade.padEnd(4)} Score: ${c.score}% (${c.credits} Credits)`);
+        const caStr = c.ca_score !== null && c.ca_score !== undefined ? `${c.ca_score}/40` : '—';
+        const examStr = c.exam_score !== null && c.exam_score !== undefined ? `${c.exam_score}/60` : '—';
+        const remarkStr = c.remark ? ` [${c.remark}]` : '';
+        lines.push(
+          `  - ${c.code.padEnd(8)} ${c.name.padEnd(30)} CA: ${caStr.padEnd(7)} Exam: ${examStr.padEnd(7)} Total: ${String(c.score).padStart(3)}%  Grade: ${c.grade.padEnd(3)}${remarkStr}`
+        );
       }
     }
 
@@ -148,11 +153,13 @@ export default function StudentResultsPage() {
               <table className="w-full text-left text-sm text-zinc-600 min-w-[500px]">
                 <thead className="text-[10px] uppercase tracking-wider text-zinc-500 bg-white border-b border-zinc-100">
                   <tr>
-                    <th className="px-5 py-3 font-bold whitespace-nowrap">Course Code</th>
-                    <th className="px-5 py-3 font-bold whitespace-nowrap">Course Name</th>
-                    <th className="px-5 py-3 font-bold text-center whitespace-nowrap">Credits</th>
-                    <th className="px-5 py-3 font-bold text-center whitespace-nowrap">Score</th>
-                    <th className="px-5 py-3 font-bold text-right whitespace-nowrap">Grade</th>
+                    <th className="px-5 py-3 font-bold whitespace-nowrap">Subject Code</th>
+                    <th className="px-5 py-3 font-bold whitespace-nowrap">Subject Title</th>
+                    <th className="px-4 py-3 font-bold text-center whitespace-nowrap">CA (Test)</th>
+                    <th className="px-4 py-3 font-bold text-center whitespace-nowrap">Exam</th>
+                    <th className="px-4 py-3 font-bold text-center whitespace-nowrap">Total</th>
+                    <th className="px-4 py-3 font-bold text-center whitespace-nowrap">Grade</th>
+                    <th className="px-5 py-3 font-bold text-right whitespace-nowrap">Remark</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
@@ -160,11 +167,23 @@ export default function StudentResultsPage() {
                     <tr key={course.id} className="hover:bg-zinc-50/50 transition-colors">
                       <td className="px-5 py-4 font-bold text-zinc-900 whitespace-nowrap">{course.code}</td>
                       <td className="px-5 py-4 font-medium text-zinc-700 whitespace-nowrap">{course.name}</td>
-                      <td className="px-5 py-4 text-center text-zinc-500 whitespace-nowrap">{course.credits}</td>
-                      <td className="px-5 py-4 text-center font-bold text-zinc-700 whitespace-nowrap">{course.score}%</td>
-                      <td className="px-5 py-4 text-right whitespace-nowrap">
+                      <td className="px-4 py-4 text-center font-mono font-semibold text-zinc-700 whitespace-nowrap">
+                        {course.ca_score !== null && course.ca_score !== undefined ? `${course.ca_score}/40` : '—'}
+                      </td>
+                      <td className="px-4 py-4 text-center font-mono font-semibold text-zinc-700 whitespace-nowrap">
+                        {course.exam_score !== null && course.exam_score !== undefined ? `${course.exam_score}/60` : '—'}
+                      </td>
+                      <td className="px-4 py-4 text-center font-mono font-black text-zinc-900 whitespace-nowrap">
+                        {course.score}%
+                      </td>
+                      <td className="px-4 py-4 text-center whitespace-nowrap">
                         <span className={`inline-block px-2.5 py-1 text-[11px] font-black rounded-md border ${getGradeColor(course.grade)}`}>
                           {course.grade}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-right whitespace-nowrap">
+                        <span className="text-xs font-semibold text-zinc-600">
+                          {course.remark || 'Satisfactory'}
                         </span>
                       </td>
                     </tr>

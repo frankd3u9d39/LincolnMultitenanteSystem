@@ -168,3 +168,135 @@ export function listAnnouncements(signal?: AbortSignal) {
 export function createAnnouncement(payload: { title: string; content: string; target_audience: string; is_important?: boolean }) {
   return api<Envelope<TeacherAnnouncement>>('/teacher/announcements', { method: 'POST', body: payload }).then((r) => r.data);
 }
+
+/* ------------------------------------------------------------------ */
+/* Teacher Results, CA & Examination Assessments                      */
+/* ------------------------------------------------------------------ */
+
+export interface TeacherResultSubject {
+  id: number;
+  code: string;
+  name: string;
+  department?: string | null;
+  teacher_name?: string;
+  is_my_subject?: boolean;
+  can_grade?: boolean;
+}
+
+export interface TeacherResultClass {
+  id: number;
+  name: string;
+  code: string;
+  room: string | null;
+  is_form_master: boolean;
+  students_count: number;
+  subjects: TeacherResultSubject[];
+}
+
+export interface TeacherStudentScore {
+  student_id: number;
+  student_profile_id?: number | null;
+  name: string;
+  email: string;
+  student_id_number: string;
+  grade_level?: string;
+  ca_score: number | null;
+  exam_score: number | null;
+  total_score: number | null;
+  grade: string | null;
+  remark: string | null;
+  updated_at?: string | null;
+}
+
+export interface TeacherClassResultsResponse {
+  status: string;
+  class: {
+    id: number;
+    name: string;
+    code: string;
+    room: string | null;
+    is_form_master: boolean;
+  };
+  subjects: TeacherResultSubject[];
+  selected_course_id: number | null;
+  term: string;
+  students: TeacherStudentScore[];
+}
+
+export function listTeacherResultClasses(signal?: AbortSignal) {
+  return api<Envelope<TeacherResultClass[]>>('/teacher/results/classes', { signal }).then((r) => r.data);
+}
+
+export function getTeacherClassResults(classId: number, courseId?: number, term?: string, signal?: AbortSignal) {
+  const query: Record<string, string | number> = {};
+  if (courseId) query.course_id = courseId;
+  if (term) query.term = term;
+  return api<TeacherClassResultsResponse>(`/teacher/classes/${classId}/results`, { query, signal });
+}
+
+export function saveTeacherClassResults(
+  classId: number,
+  payload: {
+    course_id: number;
+    term: string;
+    results: Array<{
+      student_id: number;
+      ca_score: number | null;
+      exam_score: number | null;
+      remark?: string;
+    }>;
+  }
+) {
+  return api<{ status: string; message: string; saved_count: number }>(`/teacher/classes/${classId}/results`, {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function uploadTeacherClassResultsCsv(
+  classId: number,
+  courseId: number,
+  term: string,
+  file: File,
+  uploadType: 'combined' | 'ca' | 'exam' = 'combined'
+) {
+  const token = typeof window !== 'undefined'
+    ? window.sessionStorage.getItem('lincoln.token') || window.localStorage.getItem('lincoln.token') || ''
+    : '';
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
+
+  const formData = new FormData();
+  formData.append('course_id', String(courseId));
+  formData.append('term', term);
+  formData.append('file', file);
+  formData.append('upload_type', uploadType);
+
+  const res = await fetch(`${baseUrl}/teacher/classes/${classId}/results/upload-csv`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.message || 'Failed to upload result file.');
+  }
+
+  return (await res.json()) as { status: string; message: string; saved_count: number; errors: string[] };
+}
+
+export function getTeacherTemplateUrl(
+  classId: number,
+  courseId: number,
+  term: string,
+  type: 'combined' | 'ca' | 'exam' = 'combined',
+  format: 'pdf' | 'csv' = 'pdf'
+) {
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
+  return `${baseUrl}/teacher/classes/${classId}/results/csv-template?course_id=${courseId}&term=${encodeURIComponent(term)}&type=${type}&format=${format}`;
+}
+
+

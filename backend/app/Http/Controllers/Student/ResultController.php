@@ -17,23 +17,35 @@ class ResultController extends Controller
         $student = $request->user();
 
         $enrollments = Enrollment::where('student_id', $student->id)
-            ->whereNotNull('score')
+            ->where(function ($q) {
+                $q->whereNotNull('score')
+                  ->orWhereNotNull('ca_score')
+                  ->orWhereNotNull('exam_score');
+            })
             ->with('course')
             ->get()
             ->groupBy('term');
 
         $history = $enrollments->map(function ($rows, $term) {
-            $courses = $rows->map(fn (Enrollment $e) => [
-                'id' => $e->id,
-                'name' => $e->course->name,
-                'code' => $e->course->code,
-                'credits' => $e->course->credits,
-                'grade' => $e->grade,
-                'score' => $e->score,
-            ]);
+            $courses = $rows->map(function (Enrollment $e) {
+                $hasScore = $e->score !== null;
+                $effectiveScore = $hasScore ? (float) $e->score : (float) (($e->ca_score ?? 0) + ($e->exam_score ?? 0));
 
-            $creditWeighted = $rows->sum(fn ($e) => $this->gradePoint($e->score) * $e->course->credits);
-            $totalCredits = $rows->sum(fn ($e) => $e->course->credits);
+                return [
+                    'id' => $e->id,
+                    'name' => $e->course?->name ?? 'Course',
+                    'code' => $e->course?->code ?? '',
+                    'credits' => $e->course?->credits ?? 3,
+                    'ca_score' => $e->ca_score !== null ? (float) $e->ca_score : null,
+                    'exam_score' => $e->exam_score !== null ? (float) $e->exam_score : null,
+                    'grade' => $e->grade ?? ($hasScore ? '—' : 'IP'),
+                    'score' => $effectiveScore,
+                    'remark' => $e->remark ?? ($hasScore ? 'Pass' : 'Continuous Assessment'),
+                ];
+            });
+
+            $creditWeighted = $rows->sum(fn ($e) => $this->gradePoint((float) ($e->score ?? (($e->ca_score ?? 0) + ($e->exam_score ?? 0)))) * ($e->course?->credits ?? 3));
+            $totalCredits = $rows->sum(fn ($e) => ($e->course?->credits ?? 3));
 
             return [
                 'term' => $term,
@@ -43,8 +55,8 @@ class ResultController extends Controller
         })->values();
 
         $allRows = $enrollments->flatten(1);
-        $totalCredits = $allRows->sum(fn ($e) => $e->course->credits);
-        $creditWeighted = $allRows->sum(fn ($e) => $this->gradePoint($e->score) * $e->course->credits);
+        $totalCredits = $allRows->sum(fn ($e) => ($e->course?->credits ?? 3));
+        $creditWeighted = $allRows->sum(fn ($e) => $this->gradePoint((float) $e->score) * ($e->course?->credits ?? 3));
 
         return response()->json([
             'data' => [
@@ -58,7 +70,7 @@ class ResultController extends Controller
         ]);
     }
 
-    private function gradePoint(int $score): float
+    private function gradePoint(float|int $score): float
     {
         return match (true) {
             $score >= 93 => 4.0,

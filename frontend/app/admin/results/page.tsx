@@ -4,8 +4,10 @@ import React, { useState } from 'react';
 import { useAsync } from '@/modules/superadmin/hooks/useAsync';
 import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
 import { getResultOverview } from '@/modules/admin/services/api';
+import { ClassResultsView } from '@/modules/admin/components';
 
 export default function AdminResultsPage() {
+  const [activeTab, setActiveTab] = useState<'class_results' | 'overview'>('class_results');
   const [search, setSearch] = useState('');
   const [standingFilter, setStandingFilter] = useState('all');
 
@@ -39,18 +41,51 @@ export default function AdminResultsPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-zinc-200">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight">Academic Results & Performance</h1>
+          <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight">Academic Results &amp; Reports</h1>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-            Institutional examination grading records, GPA distribution, honors roll, and transcript metrics.
+            Review and download Continuous Assessment (CA) &amp; Exam results submitted by assigned teachers, export official broadsheets, and inspect GPA rankings.
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => alert('Official institutional grades PDF generated and downloaded successfully.')}
+            className="px-4 py-2 rounded-xl bg-white border border-zinc-300 text-zinc-800 text-xs font-bold hover:bg-zinc-50 shadow-sm"
+          >
+            Export Transcripts Batch
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs Switcher */}
+      <div className="flex items-center gap-2 p-1.5 bg-zinc-100 rounded-2xl w-fit">
         <button
-          onClick={() => alert('Official institutional grades PDF generated and downloaded successfully.')}
-          className="px-4 py-2 rounded-xl bg-white border border-zinc-300 text-zinc-800 text-xs font-bold hover:bg-zinc-50 shadow-sm"
+          type="button"
+          onClick={() => setActiveTab('class_results')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+            activeTab === 'class_results'
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-900'
+          }`}
         >
-          Export Transcripts Batch
+          Class Broadsheets &amp; Teacher Marks Retrieval
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('overview')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+            activeTab === 'overview'
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-900'
+          }`}
+        >
+          Institutional GPA &amp; Rankings Overview
         </button>
       </div>
+
+      {activeTab === 'class_results' ? (
+        <ClassResultsView />
+      ) : (
+        <div className="space-y-6">
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -177,6 +212,8 @@ export default function AdminResultsPage() {
           </tbody>
         </table>
       </div>
+        </div>
+      )}
     </div>
   );
 }

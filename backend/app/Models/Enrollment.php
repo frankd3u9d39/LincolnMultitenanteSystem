@@ -14,12 +14,27 @@ class Enrollment extends Model
     public const STATUS_WITHDRAWN = 'withdrawn';
 
     protected $fillable = [
-        'school_id', 'student_id', 'course_id', 'term', 'status', 'progress', 'grade', 'score',
+        'school_id', 'student_id', 'course_id', 'school_class_id', 'term', 'status', 'progress', 'grade', 'score', 'ca_score', 'exam_score', 'remark',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'ca_score' => 'float',
+            'exam_score' => 'float',
+            'score' => 'float',
+            'progress' => 'integer',
+        ];
+    }
 
     public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);
+    }
+
+    public function schoolClass(): BelongsTo
+    {
+        return $this->belongsTo(SchoolClass::class, 'school_class_id');
     }
 
     public function student(): BelongsTo

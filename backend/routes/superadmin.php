@@ -42,6 +42,7 @@ Route::prefix('superadmin')
         Route::post('/schools', [SchoolController::class, 'store'])->name('schools.store');
         Route::get('/schools/{school}', [SchoolController::class, 'show'])->name('schools.show');
         Route::patch('/schools/{school}/quota', [SchoolController::class, 'updateQuota'])->name('schools.quota');
+        Route::patch('/schools/{school}/cbt', [SchoolController::class, 'updateCbt'])->name('schools.cbt');
         Route::post('/schools/{school}/suspend', [SchoolController::class, 'suspend'])->name('schools.suspend');
         Route::post('/schools/{school}/reinstate', [SchoolController::class, 'reinstate'])->name('schools.reinstate');
         Route::post('/schools/{school}/support-access', [SchoolController::class, 'supportAccess'])->name('schools.support-access');

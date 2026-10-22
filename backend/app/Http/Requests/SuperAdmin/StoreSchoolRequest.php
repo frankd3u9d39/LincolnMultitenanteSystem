@@ -48,6 +48,13 @@ class StoreSchoolRequest extends FormRequest
             'max_teachers' => ['sometimes', 'integer', 'min:1', 'max:10000'],
             'max_file_upload_mb' => ['sometimes', 'integer', 'min:1', 'max:1024'],
             'activate_immediately' => ['sometimes', 'boolean'],
+            'cbt_enabled' => ['sometimes', 'boolean'],
+            'logo' => ['nullable', 'file', 'image', 'max:5120'],
+            'logo_url' => ['nullable', 'string'],
+            'primary_color' => ['nullable', 'string', 'max:30'],
+            'secondary_color' => ['nullable', 'string', 'max:30'],
+            'accent_color' => ['nullable', 'string', 'max:30'],
+            'theme_palette' => ['nullable', 'string', 'max:50'],
         ];
     }
 

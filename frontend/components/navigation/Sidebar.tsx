@@ -8,6 +8,7 @@ import { ROLE_NAVIGATION, UserRole } from '@/constants/navigation';
 import { NavIcon } from './NavIcons';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/services/api';
+import { resolveSchoolLogoUrl } from '@/constants/branding';
 
 interface SidebarProps {
   role: UserRole;
@@ -34,6 +35,14 @@ export function Sidebar({
   const pathname = usePathname();
   const config = ROLE_NAVIGATION[role] || ROLE_NAVIGATION.admin;
   const { user: authUser, signOut } = useAuth();
+
+  // Dynamic school branding:
+  const primaryColor = authUser?.schoolTheme?.primaryColor || '#B81D22';
+  const secondaryColor = authUser?.schoolTheme?.secondaryColor || '#9E1519';
+  const logoUrl = authUser?.schoolLogo ? resolveSchoolLogoUrl(authUser.schoolLogo) : '/lincoln-logo.png';
+  const schoolName = authUser?.schoolName || 'Lincoln College of Science Management & Technology';
+  const schoolBadge = authUser?.schoolCode ? authUser.schoolCode.split('-')[0] : 'SMTS';
+
   const fallback = DEFAULT_USERS[role];
   const user = authUser
     ? {
@@ -114,34 +123,54 @@ export function Sidebar({
         />
       )}
 
-      {/* Sidebar Container - Darker Crimson #B81D22 */}
+      {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-[#B81D22] border-r border-[#9E1519] text-white transition-all duration-300 ease-in-out lg:static
+        style={{ backgroundColor: primaryColor, borderColor: secondaryColor }}
+        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col border-r text-white transition-all duration-300 ease-in-out lg:static
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           ${isCollapsed ? 'w-20' : 'w-72'}
         `}
       >
         {/* Header: School Branding & Tenant Context */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-white/15 bg-[#B81D22]">
+        <div
+          style={{ backgroundColor: primaryColor }}
+          className="flex items-center justify-between h-16 px-4 border-b border-white/15"
+        >
           <div className="flex items-center gap-3 overflow-hidden">
             {!isCollapsed ? (
               <div className="flex items-center gap-2.5 py-1">
-                <Image
-                  src="/lincoln-logo.png"
-                  alt="Lincoln College of Science Management & Technology"
-                  width={140}
-                  height={40}
-                  className="h-10 w-auto object-contain max-w-[170px] brightness-0 invert"
-                />
+                {authUser?.schoolLogo ? (
+                  // Custom School Logo
+                  <img
+                    src={logoUrl}
+                    alt={schoolName}
+                    className="h-10 w-auto object-contain max-w-[155px]"
+                  />
+                ) : (
+                  // Default Lincoln Logo (White inverted)
+                  <Image
+                    src="/lincoln-logo.png"
+                    alt={schoolName}
+                    width={140}
+                    height={40}
+                    className="h-10 w-auto object-contain max-w-[155px] brightness-0 invert"
+                  />
+                )}
                 <div className="h-6 w-px bg-white/30 shrink-0" />
-                <span className="font-extrabold text-xs tracking-wider text-[#B81D22] bg-white px-2 py-1 rounded-md shadow-sm shrink-0">
-                  SMTS
+                <span
+                  style={{ color: primaryColor }}
+                  className="font-extrabold text-xs tracking-wider bg-white px-2 py-1 rounded-md shadow-sm shrink-0"
+                >
+                  {schoolBadge}
                 </span>
               </div>
             ) : (
               <div className="flex items-center justify-center w-10 h-10">
-                <span className="font-black text-[11px] tracking-wider text-[#B81D22] bg-white px-1.5 py-1 rounded-md shadow-sm">
-                  SMTS
+                <span
+                  style={{ color: primaryColor }}
+                  className="font-black text-[11px] tracking-wider bg-white px-1.5 py-1 rounded-md shadow-sm"
+                >
+                  {schoolBadge}
                 </span>
               </div>
             )}
@@ -160,7 +189,10 @@ export function Sidebar({
 
         {/* Role Pill Banner */}
         {!isCollapsed && (
-          <div className="px-4 py-3 border-b border-white/15 bg-[#9E1519]">
+          <div
+            style={{ backgroundColor: secondaryColor }}
+            className="px-4 py-3 border-b border-white/15"
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs text-white/80 font-semibold uppercase tracking-wider">Workspace</span>
               <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border bg-white/20 text-white border-white/30 shadow-sm">
@@ -192,10 +224,11 @@ export function Sidebar({
                         href={item.href}
                         onClick={onMobileClose}
                         title={isCollapsed ? item.title : undefined}
+                        style={isActive ? { color: primaryColor } : undefined}
                         className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                           ${
                             isActive
-                              ? 'bg-white text-[#B81D22] font-bold shadow-md shadow-black/10'
+                              ? 'bg-white font-bold shadow-md shadow-black/10'
                               : 'text-white/90 hover:bg-white/15 hover:text-white'
                           }
                           ${isCollapsed ? 'justify-center px-0' : ''}
@@ -203,8 +236,9 @@ export function Sidebar({
                       >
                         <NavIcon
                           name={item.iconName}
+                          style={isActive ? { color: primaryColor } : undefined}
                           className={`w-5 h-5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-                            isActive ? 'text-[#B81D22]' : 'text-white/80 group-hover:text-white'
+                            isActive ? '' : 'text-white/80 group-hover:text-white'
                           }`}
                         />
 
@@ -215,9 +249,10 @@ export function Sidebar({
                         {/* Badges */}
                         {!isCollapsed && (liveBadges[item.href] !== undefined ? Boolean(liveBadges[item.href]) : Boolean(item.badge)) && (
                           <span
+                            style={isActive ? { backgroundColor: primaryColor, color: '#ffffff' } : undefined}
                             className={`ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm ${
                               isActive
-                                ? 'bg-[#B81D22] text-white'
+                                ? ''
                                 : 'bg-white/25 text-white'
                             }`}
                           >
@@ -234,16 +269,25 @@ export function Sidebar({
         </div>
 
         {/* Footer: User Profile & Collapse Toggle */}
-        <div className="p-3 border-t border-white/15 bg-[#9E1519] space-y-2">
+        <div
+          style={{ backgroundColor: secondaryColor }}
+          className="p-3 border-t border-white/15 space-y-2"
+        >
           {/* User Profile Mini-Card */}
           <div
             className={`flex items-center gap-3 p-2 rounded-xl bg-black/15 border border-white/15 ${
               isCollapsed ? 'justify-center p-1.5' : ''
             }`}
           >
-            <div className="relative flex items-center justify-center w-9 h-9 rounded-lg bg-white text-[#B81D22] font-bold text-xs shrink-0 shadow-md">
+            <div
+              style={{ color: primaryColor }}
+              className="relative flex items-center justify-center w-9 h-9 rounded-lg bg-white font-bold text-xs shrink-0 shadow-md"
+            >
               {user.initials}
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#9E1519]" />
+              <span
+                style={{ borderColor: secondaryColor }}
+                className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2"
+              />
             </div>
 
             {!isCollapsed && (

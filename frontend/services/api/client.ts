@@ -77,16 +77,22 @@ async function parse(response: Response): Promise<Record<string, unknown>> {
 }
 
 async function send(path: string, options: RequestOptions): Promise<Response> {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+
   try {
     return await fetch(buildUrl(path, options.query), {
       method: options.method ?? 'GET',
       signal: options.signal,
       headers: {
         Accept: 'application/json',
-        ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(!isFormData && options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...authHeaders(Boolean(options.public)),
       },
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: isFormData
+        ? (options.body as FormData)
+        : options.body !== undefined
+        ? JSON.stringify(options.body)
+        : undefined,
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {

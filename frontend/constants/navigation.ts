@@ -106,7 +106,7 @@ export const ROLE_NAVIGATION: Record<UserRole, RoleNavigationConfig> = {
         label: 'Academics & Grading',
         items: [
           { title: 'Assignments', href: '/teacher/assignments', iconName: 'clipboard' },
-          { title: 'Grading & Marks', href: '/teacher/grading', iconName: 'award' },
+          { title: 'Upload Results (Test & Exam)', href: '/teacher/grading', iconName: 'award' },
           { title: 'Subject Materials', href: '/teacher/materials', iconName: 'book' },
         ],
       },
@@ -136,6 +136,7 @@ export const ROLE_NAVIGATION: Record<UserRole, RoleNavigationConfig> = {
           { title: 'My Subjects', href: '/student/courses', iconName: 'book' },
           { title: 'Assignments', href: '/student/assignments', iconName: 'clipboard' },
           { title: 'Exam Results', href: '/student/results', iconName: 'award' },
+          { title: 'CBT Exam Portal', href: '/student/cbt', iconName: 'clipboard' },
           { title: 'Class Timetable', href: '/student/timetable', iconName: 'calendar' },
         ],
       },

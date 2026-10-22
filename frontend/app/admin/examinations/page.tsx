@@ -72,6 +72,7 @@ export default function AdminExaminationsPage() {
   const [invigilator, setInvigilator] = useState('');
   const [format, setFormat] = useState('Theory & Objective (Paper-Based)');
   const [duration, setDuration] = useState('2.0 Hours');
+  const [cbtAccessCode, setCbtAccessCode] = useState('');
   const [isCustomSubject, setIsCustomSubject] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -98,6 +99,7 @@ export default function AdminExaminationsPage() {
     setInvigilator('');
     setFormat('Theory & Objective (Paper-Based)');
     setDuration('2.0 Hours');
+    setCbtAccessCode('CBT-' + Math.floor(10000 + Math.random() * 90000));
     setIsCustomSubject(false);
     setFormError('');
     setShowModal(true);
@@ -156,6 +158,7 @@ export default function AdminExaminationsPage() {
         invigilator: invigilator || undefined,
         format,
         duration,
+        cbtAccessCode: format.includes('CBT') ? cbtAccessCode : undefined,
       });
       setShowModal(false);
       reload();
@@ -211,6 +214,34 @@ export default function AdminExaminationsPage() {
           + Schedule Exam
         </button>
       </div>
+
+      {!data.school_cbt_enabled && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-3">
+          <span className="px-2 py-0.5 rounded-md bg-amber-200/80 text-amber-900 font-extrabold uppercase text-[10px] shrink-0 mt-0.5">
+            Paper-Based Only
+          </span>
+          <div>
+            <p className="font-bold text-sm">Computer-Based Testing (CBT) is disabled for this school.</p>
+            <p className="text-amber-800 mt-0.5 leading-relaxed">
+              When this school was onboarded, the administrator indicated insufficient computer laboratory workstations. All examinations are conducted via traditional paper test scripts. To activate the CBT portal, request your platform SuperAdmin to enable the CBT facility flag under Tenant Governance.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {data.school_cbt_enabled && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs flex items-start gap-3">
+          <span className="px-2 py-0.5 rounded-md bg-emerald-200 text-emerald-900 font-extrabold uppercase text-[10px] shrink-0 mt-0.5">
+            CBT Facility Ready
+          </span>
+          <div>
+            <p className="font-bold text-sm">Computer-Based Testing (CBT) is active.</p>
+            <p className="text-emerald-800 mt-0.5 leading-relaxed">
+              You can schedule online CBT examinations with automated Exam Access Codes. Students use their name, registration number, and the access code to authenticate into the CBT exam room.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -287,9 +318,28 @@ export default function AdminExaminationsPage() {
                   <span className="font-medium text-zinc-800">{exam.invigilator}</span>
                 </td>
                 <td className="py-3 px-4">
-                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 text-[10px] font-semibold text-zinc-700">
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
+                    exam.format.includes('CBT') ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-zinc-100 text-zinc-700'
+                  }`}>
                     {exam.format}
                   </span>
+                  {exam.cbtAccessCode && (
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-mono font-bold flex items-center gap-1">
+                        <span>🔑 {exam.cbtAccessCode}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(exam.cbtAccessCode || '');
+                          alert(`Access code ${exam.cbtAccessCode} copied! Distribute this to students when exam begins.`);
+                        }}
+                        className="text-[10px] text-zinc-500 hover:text-zinc-800 underline font-semibold"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  )}
                 </td>
                 <td className="py-3 px-4 text-center">
                   <button
@@ -487,14 +537,47 @@ export default function AdminExaminationsPage() {
                     onChange={(e) => setFormat(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-zinc-200 text-xs text-zinc-900 focus:outline-none focus:border-[#B81D22] bg-white"
                   >
-                    {DEFAULT_FORMATS.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    ))}
+                    {DEFAULT_FORMATS.map((f) => {
+                      const isCbt = f.includes('CBT');
+                      const disabled = isCbt && !data.school_cbt_enabled;
+                      return (
+                        <option key={f} value={f} disabled={disabled}>
+                          {f} {disabled ? '— (Disabled: Paper-Based School)' : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
+
+              {/* CBT Access Code Generation if CBT format */}
+              {format.includes('CBT') && (
+                <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-emerald-950 block">Student Exam Access Code</span>
+                      <span className="text-[11px] text-emerald-800 block mt-0.5">
+                        Students must input this code along with their Student ID to unlock this CBT session.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCbtAccessCode('CBT-' + Math.floor(10000 + Math.random() * 90000))}
+                      className="px-2 py-1 bg-white border border-emerald-300 rounded-lg text-[10px] font-bold text-emerald-800 hover:bg-emerald-100"
+                    >
+                      Regenerate
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={cbtAccessCode}
+                    onChange={(e) => setCbtAccessCode(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 rounded-xl border border-emerald-300 bg-white font-mono font-bold text-emerald-900 text-sm focus:outline-none focus:border-emerald-500"
+                    placeholder="e.g. CBT-84920"
+                  />
+                </div>
+              )}
 
               {/* Invigilator & Duration */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

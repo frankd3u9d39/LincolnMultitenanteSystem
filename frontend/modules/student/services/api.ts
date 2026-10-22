@@ -82,8 +82,11 @@ export interface ResultCourse {
   name: string;
   code: string;
   credits: number;
+  ca_score?: number | null;
+  exam_score?: number | null;
   grade: string;
   score: number;
+  remark?: string;
 }
 
 export interface ResultsReport {
@@ -201,4 +204,84 @@ export function getProfile(signal?: AbortSignal) {
 
 export function updateProfile(payload: Partial<Omit<StudentProfile, 'id' | 'email' | 'program' | 'department' | 'enrollmentDate' | 'advisor' | 'status' | 'avatarUrl' | 'name'>>) {
   return api('/student/profile', { method: 'PUT', body: payload });
+}
+
+/* ------------------------------------------------------------------ */
+/* Computer-Based Testing (CBT) Portal                                 */
+/* ------------------------------------------------------------------ */
+
+export interface CbtExamListItem {
+  id: number;
+  examCode: string;
+  courseCode: string;
+  courseName: string;
+  title: string;
+  date: string;
+  time: string;
+  duration: string;
+  format: string;
+  hasSubmitted: boolean;
+  status: string;
+}
+
+export interface CbtExamListResponse {
+  cbt_enabled: boolean;
+  message?: string;
+  student?: { name: string; email: string; student_id_number: string };
+  exams: CbtExamListItem[];
+}
+
+export interface CbtQuestion {
+  id: number;
+  question: string;
+  options: Record<string, string>;
+}
+
+export interface CbtVerificationResponse {
+  verified: boolean;
+  message: string;
+  exam?: {
+    id: number;
+    title: string;
+    courseCode: string;
+    courseName: string;
+    durationMinutes: number;
+    totalPoints: number;
+    questionsCount: number;
+  };
+  student?: { name: string; student_id_number: string };
+  questions?: CbtQuestion[];
+}
+
+export interface CbtSubmitResponse {
+  message: string;
+  result: {
+    correctCount: number;
+    totalQuestions: number;
+    examScore: number;
+    examMax: number;
+    totalScore: number;
+    grade: string;
+    remark: string;
+  };
+}
+
+export function listCbtExams(signal?: AbortSignal) {
+  return api<CbtExamListResponse>('/student/cbt/exams', { signal });
+}
+
+export function verifyCbtAccess(payload: {
+  exam_id: number;
+  student_name: string;
+  student_id_number: string;
+  access_code: string;
+}) {
+  return api<CbtVerificationResponse>('/student/cbt/verify-access', { method: 'POST', body: payload });
+}
+
+export function submitCbtExam(payload: {
+  exam_id: number;
+  answers: Record<number, string>;
+}) {
+  return api<CbtSubmitResponse>('/student/cbt/submit', { method: 'POST', body: payload });
 }

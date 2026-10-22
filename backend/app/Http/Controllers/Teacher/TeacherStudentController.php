@@ -14,11 +14,15 @@ class TeacherStudentController extends Controller
         $teacher = $request->user();
         $schoolId = $teacher->school_id;
 
-        // Authorize: Teacher is Form Master, or teaches a subject to this class, or belongs to same school
-        $teacherSchoolIds = User::where('school_id', $schoolId)->where('role', User::ROLE_TEACHER)->pluck('id');
-        if ($schoolClass->teacher_id) {
-            abort_unless($teacherSchoolIds->contains($schoolClass->teacher_id), 403, 'Unauthorized class access.');
-        }
+        // Authorize: Teacher is Form Master, or teaches a subject to this class
+        $isFormMaster = ($schoolClass->teacher_id === $teacher->id);
+        $teachesSubject = $schoolClass->subjects()
+            ->where(function ($q) use ($teacher) {
+                $q->where('courses.teacher_id', $teacher->id)
+                  ->orWhere('class_subject.teacher_id', $teacher->id);
+            })->exists();
+
+        abort_unless($isFormMaster || $teachesSubject, 404, 'Class not assigned to teacher.');
 
         $students = $schoolClass->students()->with('user')->get();
 
