@@ -163,6 +163,7 @@ class TeacherResultController extends Controller
         $studentIds = $students->pluck('student_id')->filter()->values();
 
         $enrollments = collect();
+        $cbtSubmissions = collect();
         if ($courseId && $studentIds->isNotEmpty()) {
             $enrollments = Enrollment::where('school_id', $school->id)
                 ->where('course_id', $courseId)
@@ -170,10 +171,34 @@ class TeacherResultController extends Controller
                 ->whereIn('student_id', $studentIds)
                 ->get()
                 ->keyBy('student_id');
+
+            $cbtAssignmentIds = \App\Models\Assignment::where('school_id', $school->id)
+                ->where('course_id', $courseId)
+                ->where('type', 'Exam')
+                ->pluck('id');
+
+            if ($cbtAssignmentIds->isNotEmpty()) {
+                $cbtSubmissions = \App\Models\AssignmentSubmission::whereIn('assignment_id', $cbtAssignmentIds)
+                    ->whereIn('student_id', $studentIds)
+                    ->get()
+                    ->keyBy('student_id');
+            }
         }
 
-        $results = $students->map(function ($s) use ($enrollments) {
+        $results = $students->map(function ($s) use ($enrollments, $cbtSubmissions) {
             $enrollment = $enrollments->get($s['student_id']);
+            $cbtSub = $cbtSubmissions->get($s['student_id']);
+
+            $cbtInfo = null;
+            if ($cbtSub) {
+                $cbtInfo = [
+                    'id' => $cbtSub->id,
+                    'status' => $cbtSub->status,
+                    'submitted_at' => $cbtSub->submitted_at?->toIso8601String(),
+                    'file_path' => $cbtSub->file_path,
+                    'pdf_url' => $cbtSub->file_path ? url($cbtSub->file_path) : null,
+                ];
+            }
 
             return [
                 'student_id' => $s['student_id'],
@@ -188,6 +213,7 @@ class TeacherResultController extends Controller
                 'grade' => $enrollment?->grade,
                 'remark' => $enrollment?->remark,
                 'updated_at' => $enrollment?->updated_at?->toIso8601String(),
+                'cbt_submission' => $cbtInfo,
             ];
         });
 
@@ -882,5 +908,25 @@ class TeacherResultController extends Controller
             'E' => 'Fair',
             default => 'Fail',
         };
+    }
+
+    /**
+     * Downloads a candidate's CBT Examination Answer Script PDF for teacher manual marking.
+     */
+    public function downloadCbtScript(Request $request, \App\Models\AssignmentSubmission $submission): \Symfony\Component\HttpFoundation\Response
+    {
+        $teacher = $request->user();
+        if ($submission->assignment?->school_id !== $teacher->school_id) {
+            abort(403, 'Unauthorized script access.');
+        }
+
+        if (! $submission->file_path || ! file_exists(public_path($submission->file_path))) {
+            return response()->json(['message' => 'Candidate Answer Script PDF file not found.'], 404);
+        }
+
+        $filePath = public_path($submission->file_path);
+        return response()->download($filePath, basename($filePath), [
+            'Content-Type' => 'application/pdf',
+        ]);
     }
 }

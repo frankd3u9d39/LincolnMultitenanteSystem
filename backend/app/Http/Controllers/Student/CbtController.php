@@ -29,7 +29,7 @@ class CbtController extends Controller
     public function exams(Request $request): JsonResponse
     {
         $student = $request->user();
-        $school = $student->school;
+        $school = $student->school()->first() ?? $student->school;
 
         if (! $school->cbt_enabled) {
             return response()->json([
@@ -53,8 +53,12 @@ class CbtController extends Controller
             $meta = json_decode($a->instructions, true) ?? [];
             $hasSubmitted = AssignmentSubmission::where('assignment_id', $a->id)
                 ->where('student_id', $student->id)
-                ->where('status', 'graded')
+                ->whereIn('status', ['submitted', 'graded'])
                 ->exists();
+
+            $submission = $hasSubmitted
+                ? AssignmentSubmission::where('assignment_id', $a->id)->where('student_id', $student->id)->first()
+                : null;
 
             $dateStr = $a->due_at ? $a->due_at->toDateString() : Carbon::today()->toDateString();
             $timeVal = $meta['time'] ?? '08:30 - 10:30';
@@ -70,7 +74,8 @@ class CbtController extends Controller
                 'duration' => $meta['duration'] ?? '1.0 Hour',
                 'format' => $meta['format'] ?? 'CBT (Computer Based Test)',
                 'hasSubmitted' => $hasSubmitted,
-                'status' => $hasSubmitted ? 'Completed' : ($meta['status'] ?? 'Scheduled'),
+                'status' => $hasSubmitted ? ($submission?->status === 'graded' ? 'Graded' : 'Awaiting Teacher Marking') : ($meta['status'] ?? 'Scheduled'),
+                'scriptPdfUrl' => ($hasSubmitted && $submission?->file_path) ? url($submission->file_path) : null,
             ];
         });
 
@@ -91,7 +96,7 @@ class CbtController extends Controller
     public function verifyAccess(Request $request): JsonResponse
     {
         $student = $request->user();
-        $school = $student->school;
+        $school = $student->school()->first() ?? $student->school;
 
         if (! $school->cbt_enabled) {
             return response()->json([
@@ -123,13 +128,16 @@ class CbtController extends Controller
         // Check if student already submitted this exam
         $alreadySubmitted = AssignmentSubmission::where('assignment_id', $assignment->id)
             ->where('student_id', $student->id)
-            ->where('status', 'graded')
+            ->whereIn('status', ['submitted', 'graded'])
             ->first();
 
         if ($alreadySubmitted) {
+            $msg = $alreadySubmitted->status === 'graded'
+                ? sprintf('You have already completed and submitted this examination with an awarded score of %d%%.', $alreadySubmitted->score)
+                : 'You have already submitted this examination. Your answer script is with your course teacher for manual marking and result upload.';
             return response()->json([
                 'verified' => false,
-                'message' => sprintf('You have already completed and submitted this examination with a score of %d%%.', $alreadySubmitted->score),
+                'message' => $msg,
             ], 400);
         }
 
@@ -157,109 +165,77 @@ class CbtController extends Controller
     }
 
     /**
-     * Submits the student's CBT examination answers, auto-grades, and updates the student's result.
+     * Submits the student's CBT examination answers, compiles the answer script as a PDF
+     * for teacher manual grading, and leaves score assignment to the teacher.
      */
     public function submitExam(Request $request): JsonResponse
     {
         $student = $request->user();
-        $school = $student->school;
+        $school = $student->school()->first() ?? $student->school;
 
         $validated = $request->validate([
             'exam_id' => ['required', 'integer', 'exists:assignments,id'],
-            'answers' => ['required', 'array'],
+            'answers' => ['present', 'array'],
+            'reason' => ['nullable', 'string', 'max:255'],
         ]);
 
         $assignment = Assignment::where('school_id', $school->id)->findOrFail($validated['exam_id']);
         $questions = $this->getExamQuestions($assignment);
+        $reason = $validated['reason'] ?? 'Standard Exam Completion';
 
-        $correctCount = 0;
-        $totalQuestions = count($questions);
-        $pointsPerQuestion = $totalQuestions > 0 ? (60 / $totalQuestions) : 0; // standard 60 marks for exam
+        // Generate Candidate Answer Script PDF for teacher evaluation and manual marking
+        $pdfService = new \App\Services\Pdf\CbtScriptPdfService();
+        $pdfResult = $pdfService->generateCandidateScriptPdf(
+            $assignment,
+            $student,
+            $questions,
+            $validated['answers'],
+            $reason
+        );
 
-        foreach ($questions as $q) {
-            $qId = $q['id'];
-            $selectedAnswer = $validated['answers'][$qId] ?? null;
-            if ($selectedAnswer && strtoupper($selectedAnswer) === strtoupper($q['correct_answer'])) {
-                $correctCount++;
-            }
-        }
-
-        $calculatedExamScore = round($correctCount * $pointsPerQuestion, 1);
-
-        // Record submission
+        // Record submission in 'submitted' status with file_path pointing to the PDF
+        // Score remains null until evaluated and uploaded by the teacher
         AssignmentSubmission::updateOrCreate(
             [
                 'assignment_id' => $assignment->id,
                 'student_id' => $student->id,
             ],
             [
-                'status' => 'graded',
-                'submission_text' => json_encode(['answers' => $validated['answers']]),
+                'status' => 'submitted',
+                'submission_text' => json_encode([
+                    'answers' => $validated['answers'],
+                    'reason' => $reason,
+                    'pdf_path' => $pdfResult['relative_path'],
+                    'answered_count' => $pdfResult['answered_count'],
+                    'total_questions' => $pdfResult['total_questions'],
+                ]),
+                'file_path' => $pdfResult['relative_path'],
                 'submitted_at' => now(),
-                'score' => (int) round(($correctCount / $totalQuestions) * 100),
-                'feedback' => sprintf('CBT Exam Completed: %d/%d questions correct. Score: %0.1f/60', $correctCount, $totalQuestions, $calculatedExamScore),
+                'score' => null,
+                'feedback' => sprintf('CBT Exam [%s]: Answer script compiled as PDF for teacher manual grading.', $reason),
             ]
         );
 
-        // Also update or create the student's enrollment record with the new exam score!
-        $courseId = $assignment->course_id ?? Course::where('school_id', $school->id)->value('id');
-        $term = $school->academic_year_current ?? 'First Term 2025/2026';
-
-        if ($courseId) {
-            $enrollment = Enrollment::where('school_id', $school->id)
-                ->where('student_id', $student->id)
-                ->where('course_id', $courseId)
-                ->where('term', $term)
-                ->first();
-
-            $currentCa = $enrollment?->ca_score ?? 25.0; // fallback standard CA if not yet entered
-            $totalScore = round($currentCa + $calculatedExamScore, 1);
-            $grade = match (true) {
-                $totalScore >= 75 => 'A',
-                $totalScore >= 65 => 'B',
-                $totalScore >= 50 => 'C',
-                $totalScore >= 45 => 'D',
-                $totalScore >= 40 => 'E',
-                default => 'F',
-            };
-            $remark = match ($grade) {
-                'A' => 'Distinction',
-                'B' => 'Very Good',
-                'C' => 'Credit',
-                'D' => 'Pass',
-                'E' => 'Fair',
-                default => 'Fail',
-            };
-
-            Enrollment::updateOrCreate(
-                [
-                    'school_id' => $school->id,
-                    'student_id' => $student->id,
-                    'course_id' => $courseId,
-                    'term' => $term,
-                ],
-                [
-                    'ca_score' => $currentCa,
-                    'exam_score' => $calculatedExamScore,
-                    'score' => $totalScore,
-                    'grade' => $grade,
-                    'remark' => $remark,
-                    'status' => Enrollment::STATUS_COMPLETED,
-                    'progress' => 100,
-                ]
-            );
-        }
+        $studentProfile = $student->studentProfile;
+        $studentIdNumber = $studentProfile?->student_id_number ?? ('LC-STD-' . str_pad($student->id, 4, '0', STR_PAD_LEFT));
+        $courseTitle = ($assignment->course?->code ?? 'CBT') . ' - ' . ($assignment->course?->name ?? $assignment->title);
 
         return response()->json([
-            'message' => 'Examination submitted and graded successfully.',
+            'message' => 'Examination submitted successfully. Your answer script has been compiled into an official PDF document and delivered to your course teacher for manual marking.',
             'result' => [
-                'correctCount' => $correctCount,
-                'totalQuestions' => $totalQuestions,
-                'examScore' => $calculatedExamScore,
-                'examMax' => 60,
-                'totalScore' => $totalScore,
-                'grade' => $grade,
-                'remark' => $remark,
+                'status' => 'pending_teacher_marking',
+                'hasSubmitted' => true,
+                'submittedAt' => now()->toIso8601String(),
+                'reason' => $reason,
+                'totalQuestions' => $pdfResult['total_questions'],
+                'answeredCount' => $pdfResult['answered_count'],
+                'pdfUrl' => url($pdfResult['relative_path']),
+                'pdfFilename' => $pdfResult['filename'],
+                'candidate' => [
+                    'name' => $student->name,
+                    'student_id_number' => $studentIdNumber,
+                    'course' => $courseTitle,
+                ],
             ],
         ]);
     }

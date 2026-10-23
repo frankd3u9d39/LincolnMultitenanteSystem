@@ -52,4 +52,5 @@ Route::prefix('teacher')->name('teacher.')->middleware(['auth:sanctum', 'teacher
     Route::post('/classes/{schoolClass}/results/csv-upload', [\App\Http\Controllers\Teacher\TeacherResultController::class, 'uploadCsv'])->name('classes.results.csv-upload');
     Route::get('/classes/{schoolClass}/results/csv-template', [\App\Http\Controllers\Teacher\TeacherResultController::class, 'csvTemplate'])->name('classes.results.csv-template');
     Route::get('/classes/{schoolClass}/results/export', [\App\Http\Controllers\Teacher\TeacherResultController::class, 'export'])->name('classes.results.export');
+    Route::get('/results/cbt-scripts/{submission}/download', [\App\Http\Controllers\Teacher\TeacherResultController::class, 'downloadCbtScript'])->name('results.cbt-scripts.download');
 });

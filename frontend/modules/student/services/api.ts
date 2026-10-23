@@ -222,6 +222,7 @@ export interface CbtExamListItem {
   format: string;
   hasSubmitted: boolean;
   status: string;
+  scriptPdfUrl?: string | null;
 }
 
 export interface CbtExamListResponse {
@@ -256,13 +257,19 @@ export interface CbtVerificationResponse {
 export interface CbtSubmitResponse {
   message: string;
   result: {
-    correctCount: number;
+    status: string;
+    hasSubmitted: boolean;
+    submittedAt: string;
+    reason?: string;
     totalQuestions: number;
-    examScore: number;
-    examMax: number;
-    totalScore: number;
-    grade: string;
-    remark: string;
+    answeredCount: number;
+    pdfUrl?: string;
+    pdfFilename?: string;
+    candidate?: {
+      name: string;
+      student_id_number: string;
+      course: string;
+    };
   };
 }
 
@@ -282,6 +289,7 @@ export function verifyCbtAccess(payload: {
 export function submitCbtExam(payload: {
   exam_id: number;
   answers: Record<number, string>;
+  reason?: string;
 }) {
   return api<CbtSubmitResponse>('/student/cbt/submit', { method: 'POST', body: payload });
 }

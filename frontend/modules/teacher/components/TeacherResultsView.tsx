@@ -32,6 +32,13 @@ interface EditableStudentScore {
   grade: string | null;
   remark: string;
   updated_at?: string | null;
+  cbt_submission?: {
+    id: number;
+    status: string;
+    submitted_at: string | null;
+    file_path: string | null;
+    pdf_url: string | null;
+  } | null;
 }
 
 function calculateGradeAndRemark(total: number | null): { grade: string | null; remark: string } {
@@ -46,13 +53,14 @@ function calculateGradeAndRemark(total: number | null): { grade: string | null; 
 
 const getGradeBadge = (grade: string | null) => {
   if (!grade) return <span className="text-zinc-400 font-mono text-xs">—</span>;
-  if (grade === 'A') return <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">A (Distinction)</span>;
-  if (grade === 'B') return <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black bg-blue-100 text-blue-800 border border-blue-200">B (Very Good)</span>;
-  if (grade === 'C') return <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black bg-amber-100 text-amber-800 border border-amber-200">C (Credit)</span>;
-  if (grade === 'D') return <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black bg-orange-100 text-orange-800 border border-orange-200">D (Pass)</span>;
-  if (grade === 'E') return <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black bg-purple-100 text-purple-800 border border-purple-200">E (Fair)</span>;
-  if (grade === 'IP') return <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black bg-zinc-100 text-zinc-700 border border-zinc-300">In Progress</span>;
-  return <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black bg-red-100 text-red-800 border border-red-200">F (Fail)</span>;
+  const base = "px-2.5 py-1 rounded-lg text-[11px] font-black border whitespace-nowrap inline-flex items-center justify-center gap-1 shadow-xs";
+  if (grade === 'A') return <span className={`${base} bg-emerald-50 text-emerald-800 border-emerald-200`}>A &bull; Distinction</span>;
+  if (grade === 'B') return <span className={`${base} bg-blue-50 text-blue-800 border-blue-200`}>B &bull; Very Good</span>;
+  if (grade === 'C') return <span className={`${base} bg-amber-50 text-amber-800 border-amber-200`}>C &bull; Credit</span>;
+  if (grade === 'D') return <span className={`${base} bg-orange-50 text-orange-800 border-orange-200`}>D &bull; Pass</span>;
+  if (grade === 'E') return <span className={`${base} bg-purple-50 text-purple-800 border-purple-200`}>E &bull; Fair</span>;
+  if (grade === 'IP') return <span className={`${base} bg-zinc-100 text-zinc-700 border-zinc-300 font-bold`}>In Progress</span>;
+  return <span className={`${base} bg-red-50 text-red-800 border-red-200`}>F &bull; Fail</span>;
 };
 
 export function TeacherResultsView() {
@@ -148,6 +156,7 @@ export function TeacherResultsView() {
             grade,
             remark,
             updated_at: s.updated_at,
+            cbt_submission: s.cbt_submission,
           };
         });
         setScores(mapped);
@@ -792,21 +801,27 @@ export function TeacherResultsView() {
 
       {/* 5. Live Broadsheet Table & Quick Score Editor */}
       <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="p-4 sm:p-5 border-b border-zinc-200 bg-gradient-to-r from-zinc-50/90 to-white flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h3 className="text-sm font-bold text-zinc-900">
-              Live Results Broadsheet &amp; Score Preview — {currentSubjectObj?.name || 'Subject'}
-            </h3>
-            <p className="text-[11px] text-zinc-500 mt-0.5">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-black text-zinc-900">
+                Live Results Broadsheet &amp; Score Preview
+              </h3>
+              <span className="text-zinc-300 font-bold">&bull;</span>
+              <span className="px-2.5 py-0.5 rounded-md bg-red-50 text-[#B81D22] border border-red-200 text-xs font-bold">
+                {currentSubjectObj?.name || 'Subject'}
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-500 mt-1">
               Continuous Assessment (CA / 40) + Terminal Exam (70) = Total (100). All marks saved here are visible to students and downloadable by Admins.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0">
             <button
               type="button"
               onClick={() => handleExportBroadsheet('pdf')}
-              className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 active:scale-95"
+              className="px-3.5 py-2 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
               title="Download official broadsheet in printable PDF format"
             >
               <svg className="w-3.5 h-3.5 text-[#B81D22]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -819,7 +834,7 @@ export function TeacherResultsView() {
               type="button"
               onClick={handleSaveAll}
               disabled={saving || scores.length === 0}
-              className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-[#B81D22] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
+              className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-[#B81D22] text-white text-xs font-black transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 active:scale-95 cursor-pointer"
             >
               {saving ? (
                 <span>Saving Changes...</span>
@@ -836,36 +851,69 @@ export function TeacherResultsView() {
         </div>
 
         {loading ? (
-          <div className="p-12 text-center text-xs text-zinc-500">Loading student scores roster...</div>
+          <div className="p-12 text-center text-xs text-zinc-500 animate-pulse">Loading student scores roster...</div>
         ) : scores.length === 0 ? (
           <div className="p-12 text-center text-xs text-zinc-500">No students registered in this class.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[1180px]">
               <thead>
-                <tr className="bg-zinc-50/75 border-b border-zinc-200 text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                  <th className="py-3 px-4">#</th>
-                  <th className="py-3 px-4">Student Details</th>
-                  <th className="py-3 px-4">Student ID Number</th>
-                  <th className="py-3 px-4 w-28 text-center">CA / Test (40)</th>
-                  <th className="py-3 px-4 w-28 text-center">Exam (70)</th>
-                  <th className="py-3 px-4 text-center w-24">Total (100)</th>
-                  <th className="py-3 px-4 text-center w-28">Letter Grade</th>
-                  <th className="py-3 px-4 w-44">Remarks</th>
+                <tr className="bg-zinc-50/90 border-b border-zinc-200 text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                  <th className="py-3.5 px-3 w-12 text-center">#</th>
+                  <th className="py-3.5 px-4 min-w-[190px]">Student Details</th>
+                  <th className="py-3.5 px-3 w-32 whitespace-nowrap">Student ID</th>
+                  <th className="py-3.5 px-3 w-44 text-center whitespace-nowrap">CBT Answer Script</th>
+                  <th className="py-3.5 px-3 w-32 text-center whitespace-nowrap">CA / Test (40)</th>
+                  <th className="py-3.5 px-3 w-32 text-center whitespace-nowrap">Exam (70)</th>
+                  <th className="py-3.5 px-3 w-28 text-center whitespace-nowrap">Total (100)</th>
+                  <th className="py-3.5 px-3 w-36 text-center whitespace-nowrap">Letter Grade</th>
+                  <th className="py-3.5 px-4 min-w-[220px]">Remarks</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 text-xs text-zinc-800">
                 {scores.map((s, idx) => (
-                  <tr key={s.student_id} className="hover:bg-zinc-50/50 transition-colors">
-                    <td className="py-3 px-4 text-zinc-400 font-mono text-[11px]">{idx + 1}</td>
-                    <td className="py-3 px-4">
-                      <p className="font-bold text-zinc-900">{s.name}</p>
-                      <p className="text-[11px] text-zinc-400">{s.email}</p>
+                  <tr key={s.student_id} className="hover:bg-zinc-50/60 transition-colors">
+                    <td className="py-3.5 px-3 text-zinc-400 font-mono text-[11px] text-center align-middle">
+                      {idx + 1}
                     </td>
-                    <td className="py-3 px-4 font-mono font-semibold text-[11px] text-zinc-600">
+                    <td className="py-3.5 px-4 align-middle">
+                      <p className="font-bold text-zinc-900 leading-snug">{s.name}</p>
+                      <p className="text-[11px] text-zinc-400 font-mono mt-0.5">{s.email}</p>
+                    </td>
+                    <td className="py-3.5 px-3 font-mono font-bold text-xs text-zinc-700 align-middle whitespace-nowrap">
                       {s.student_id_number}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3.5 px-3 text-center align-middle whitespace-nowrap">
+                      {s.cbt_submission?.pdf_url ? (
+                        <div className="inline-flex flex-col items-center gap-1">
+                          <a
+                            href={s.cbt_submission.pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100/90 text-[#B81D22] text-xs font-bold shadow-xs hover:shadow-sm transition-all whitespace-nowrap active:scale-95"
+                            title="Download candidate answer script PDF for manual evaluation"
+                          >
+                            <svg className="w-3.5 h-3.5 shrink-0 text-[#B81D22]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span>Mark Script (PDF)</span>
+                          </a>
+                          <span
+                            className={`text-[9px] font-black uppercase tracking-wider whitespace-nowrap px-2 py-0.5 rounded ${
+                              s.exam_score
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                : 'bg-amber-50 text-amber-900 border border-amber-200'
+                            }`}
+                          >
+                            {s.exam_score ? 'Mark Uploaded' : 'Awaiting Mark'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-zinc-400 italic whitespace-nowrap">No CBT script</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-3 text-center align-middle whitespace-nowrap">
                       <input
                         type="number"
                         min="0"
@@ -874,10 +922,10 @@ export function TeacherResultsView() {
                         placeholder="0 - 40"
                         value={s.ca_score}
                         onChange={(e) => handleScoreChange(idx, 'ca_score', e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs text-center rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] font-semibold"
+                        className="w-24 mx-auto px-2.5 py-1.5 text-xs text-center rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] font-bold text-zinc-900 shadow-2xs block"
                       />
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3.5 px-3 text-center align-middle whitespace-nowrap">
                       <input
                         type="number"
                         min="0"
@@ -886,26 +934,32 @@ export function TeacherResultsView() {
                         placeholder="0 - 70"
                         value={s.exam_score}
                         onChange={(e) => handleScoreChange(idx, 'exam_score', e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs text-center rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] font-semibold"
+                        className="w-24 mx-auto px-2.5 py-1.5 text-xs text-center rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] font-bold text-zinc-900 shadow-2xs block"
                       />
                     </td>
-                    <td className="py-3 px-4 text-center font-black text-sm">
+                    <td className="py-3.5 px-3 text-center align-middle whitespace-nowrap">
                       {s.total_score !== null ? (
-                        <span className={s.total_score >= 40 ? 'text-zinc-900' : 'text-red-600'}>
-                          {s.total_score}
+                        <span
+                          className={`font-mono font-black text-sm ${
+                            s.total_score >= 40 ? 'text-zinc-900' : 'text-red-600'
+                          }`}
+                        >
+                          {s.total_score}%
                         </span>
                       ) : (
                         <span className="text-zinc-300 font-mono text-xs">—</span>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-center">{getGradeBadge(s.grade)}</td>
-                    <td className="py-3 px-4">
+                    <td className="py-3.5 px-3 text-center align-middle whitespace-nowrap">
+                      {getGradeBadge(s.grade)}
+                    </td>
+                    <td className="py-3.5 px-4 align-middle">
                       <input
                         type="text"
-                        placeholder="Remark"
+                        placeholder="Teacher remark / standing"
                         value={s.remark}
                         onChange={(e) => handleScoreChange(idx, 'remark', e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22]"
+                        className="w-full min-w-[200px] px-3 py-1.5 text-xs rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] text-zinc-800 placeholder:text-zinc-400 shadow-2xs"
                       />
                     </td>
                   </tr>

@@ -206,6 +206,13 @@ export interface TeacherStudentScore {
   grade: string | null;
   remark: string | null;
   updated_at?: string | null;
+  cbt_submission?: {
+    id: number;
+    status: string;
+    submitted_at: string | null;
+    file_path: string | null;
+    pdf_url: string | null;
+  } | null;
 }
 
 export interface TeacherClassResultsResponse {

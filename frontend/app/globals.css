@@ -88,3 +88,26 @@ body {
   animation: eye-blink 4s infinite;
 }
 
+/* Secure Locked CBT Exam Room Mode: Complete Sidebar and Navbar suppression */
+body.cbt-exam-active {
+  overflow: hidden !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+body.cbt-exam-active aside,
+body.cbt-exam-active nav,
+body.cbt-exam-active header {
+  display: none !important;
+}
+
+body.cbt-exam-active main {
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+}
+
+

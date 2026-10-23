@@ -99,7 +99,7 @@ class ExaminationController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $school = $request->user()->school;
+        $school = $request->user()->school()->first() ?? $request->user()->school;
 
         $data = $request->validate([
             'courseCode' => ['required', 'string', 'max:20'],
