@@ -1,9 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -39,7 +40,7 @@ class ResultOverviewController extends Controller
                 'id' => $s->id,
                 'name' => $s->name,
                 'email' => $s->email,
-                'idNumber' => $s->studentProfile?->student_id_number ?? ('LC-STD-' . str_pad($s->id, 4, '0', STR_PAD_LEFT)),
+                'idNumber' => $s->studentProfile?->student_id_number ?? ('LC-STD-'.str_pad((string) $s->id, 4, '0', STR_PAD_LEFT)),
                 'gpa' => $gpa,
                 'averageScore' => $avgScore,
                 'coursesPassed' => $coursesPassed,
@@ -54,7 +55,7 @@ class ResultOverviewController extends Controller
 
         $totalEnrollmentsCount = $enrollments->whereNotNull('score')->count();
         $passedCount = $enrollments->where('score', '>=', 50)->count();
-        $passRate = $totalEnrollmentsCount > 0 ? round(($passedCount / $totalEnrollmentsCount) * 100, 1) . '%' : '0.0%';
+        $passRate = $totalEnrollmentsCount > 0 ? round(($passedCount / $totalEnrollmentsCount) * 100, 1).'%' : '0.0%';
 
         $gpaDistribution = [
             [

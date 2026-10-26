@@ -22,6 +22,7 @@ class TeacherModuleTest extends TestCase
     use RefreshDatabase;
 
     private School $school;
+
     private User $teacher;
 
     protected function setUp(): void

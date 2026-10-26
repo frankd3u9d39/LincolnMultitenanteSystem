@@ -7,6 +7,7 @@ import { useAsync } from '@/modules/superadmin/hooks/useAsync';
 import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
 import { getDashboard, listAssignments, listClasses, listAnnouncements } from '@/modules/teacher/services/api';
 import { useAuth } from '@/lib/auth';
+import { SchoolInfoBanner } from '@/components/branding/SchoolInfoBanner';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -39,6 +40,18 @@ export default function TeacherDashboard() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
+      {/* School Info Banner */}
+      <SchoolInfoBanner
+        schoolName={user?.schoolName}
+        schoolMotto={user?.schoolMotto}
+        schoolLogo={user?.schoolLogo}
+        schoolCode={user?.schoolCode}
+        schoolAddress={user?.schoolAddress}
+        schoolEmail={user?.schoolEmail}
+        schoolPhone={user?.schoolPhone}
+        variant="card"
+      />
+
       {/* Welcome Banner */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#B81D22] to-[#801217] text-white p-8 shadow-lg">
         {/* Decorative elements */}

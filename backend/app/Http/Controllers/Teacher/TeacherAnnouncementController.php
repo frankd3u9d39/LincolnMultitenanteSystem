@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
@@ -18,7 +20,7 @@ class TeacherAnnouncementController extends Controller
             $query->where('teacher_id', $request->user()->id)
                 ->orWhere(function ($q) use ($schoolUserIds) {
                     $q->whereIn('teacher_id', $schoolUserIds)
-                      ->whereIn('target_audience', ['all', 'both', 'teachers']);
+                        ->whereIn('target_audience', ['all', 'both', 'teachers']);
                 });
         })->latest()->get();
 

@@ -53,7 +53,7 @@ return [
     */
 
     'url' => env('APP_URL', 'http://localhost'),
-/*    |--------------------------------------------------------------------------    | Frontend URL    |--------------------------------------------------------------------------    |    | Base URL of the Next.js application, used to build links in emails such as    | password resets.    |    */    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+    /*    |--------------------------------------------------------------------------    | Frontend URL    |--------------------------------------------------------------------------    |    | Base URL of the Next.js application, used to build links in emails such as    | password resets.    | */ 'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
 
     /*
     |--------------------------------------------------------------------------

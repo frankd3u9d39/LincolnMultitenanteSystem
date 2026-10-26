@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useId } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   listTeacherResultClasses,
   getTeacherClassResults,
@@ -18,7 +18,7 @@ const TERMS = [
   'Third Term 2025/2026',
 ];
 
-type UploadType = 'combined' | 'ca' | 'exam';
+type UploadType = 'combined' | '1ca' | '2ca' | 'ca' | 'exam';
 
 interface EditableStudentScore {
   student_id: number;
@@ -26,6 +26,8 @@ interface EditableStudentScore {
   email: string;
   student_id_number: string;
   grade_level?: string;
+  ca1_score: string;
+  ca2_score: string;
   ca_score: string;
   exam_score: string;
   total_score: number | null;
@@ -43,27 +45,28 @@ interface EditableStudentScore {
 
 function calculateGradeAndRemark(total: number | null): { grade: string | null; remark: string } {
   if (total === null || isNaN(total)) return { grade: null, remark: '' };
-  if (total >= 75) return { grade: 'A', remark: 'Distinction' };
-  if (total >= 65) return { grade: 'B', remark: 'Very Good' };
-  if (total >= 50) return { grade: 'C', remark: 'Credit' };
-  if (total >= 45) return { grade: 'D', remark: 'Pass' };
-  if (total >= 40) return { grade: 'E', remark: 'Fair' };
+  if (total >= 70) return { grade: 'A', remark: 'Excellent' };
+  if (total >= 60) return { grade: 'B', remark: 'Very Good' };
+  if (total >= 50) return { grade: 'C', remark: 'Good' };
+  if (total >= 40) return { grade: 'D', remark: 'Pass' };
+  if (total >= 30) return { grade: 'E', remark: 'Fail' };
   return { grade: 'F', remark: 'Fail' };
 }
 
 const getGradeBadge = (grade: string | null) => {
   if (!grade) return <span className="text-zinc-400 font-mono text-xs">—</span>;
   const base = "px-2.5 py-1 rounded-lg text-[11px] font-black border whitespace-nowrap inline-flex items-center justify-center gap-1 shadow-xs";
-  if (grade === 'A') return <span className={`${base} bg-emerald-50 text-emerald-800 border-emerald-200`}>A &bull; Distinction</span>;
+  if (grade === 'A') return <span className={`${base} bg-emerald-50 text-emerald-800 border-emerald-200`}>A &bull; Excellent</span>;
   if (grade === 'B') return <span className={`${base} bg-blue-50 text-blue-800 border-blue-200`}>B &bull; Very Good</span>;
-  if (grade === 'C') return <span className={`${base} bg-amber-50 text-amber-800 border-amber-200`}>C &bull; Credit</span>;
+  if (grade === 'C') return <span className={`${base} bg-amber-50 text-amber-800 border-amber-200`}>C &bull; Good</span>;
   if (grade === 'D') return <span className={`${base} bg-orange-50 text-orange-800 border-orange-200`}>D &bull; Pass</span>;
-  if (grade === 'E') return <span className={`${base} bg-purple-50 text-purple-800 border-purple-200`}>E &bull; Fair</span>;
+  if (grade === 'E') return <span className={`${base} bg-rose-50 text-rose-800 border-rose-200`}>E &bull; Fail</span>;
   if (grade === 'IP') return <span className={`${base} bg-zinc-100 text-zinc-700 border-zinc-300 font-bold`}>In Progress</span>;
   return <span className={`${base} bg-red-50 text-red-800 border-red-200`}>F &bull; Fail</span>;
 };
 
 export function TeacherResultsView() {
+  const [mounted, setMounted] = useState(false);
   const [classes, setClasses] = useState<TeacherResultClass[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
@@ -82,7 +85,10 @@ export function TeacherResultsView() {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string; errors?: string[] } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dropZoneId = useId();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Load teacher assigned classes
   useEffect(() => {
@@ -137,6 +143,8 @@ export function TeacherResultsView() {
         }
 
         const mapped: EditableStudentScore[] = (data.students || []).map((s) => {
+          const ca1Str = s.ca1_score !== null && s.ca1_score !== undefined ? String(s.ca1_score) : '';
+          const ca2Str = s.ca2_score !== null && s.ca2_score !== undefined ? String(s.ca2_score) : '';
           const caStr = s.ca_score !== null && s.ca_score !== undefined ? String(s.ca_score) : '';
           const examStr = s.exam_score !== null && s.exam_score !== undefined ? String(s.exam_score) : '';
           const total = s.total_score !== null && s.total_score !== undefined ? s.total_score : null;
@@ -150,6 +158,8 @@ export function TeacherResultsView() {
             email: s.email,
             student_id_number: s.student_id_number,
             grade_level: s.grade_level,
+            ca1_score: ca1Str,
+            ca2_score: ca2Str,
             ca_score: caStr,
             exam_score: examStr,
             total_score: total,
@@ -174,12 +184,20 @@ export function TeacherResultsView() {
   }, [selectedClassId, selectedCourseId, selectedTerm]);
 
   // Score adjustments
-  const handleScoreChange = (index: number, field: 'ca_score' | 'exam_score' | 'remark', value: string) => {
+  const handleScoreChange = (index: number, field: 'ca1_score' | 'ca2_score' | 'ca_score' | 'exam_score' | 'remark', value: string) => {
     setScores((prev) => {
       const next = [...prev];
       const target = { ...next[index], [field]: value };
 
-      if (field === 'ca_score' || field === 'exam_score') {
+      if (field === 'ca1_score' || field === 'ca2_score' || field === 'ca_score' || field === 'exam_score') {
+        if (field === 'ca1_score' || field === 'ca2_score') {
+          const c1 = target.ca1_score.trim() !== '' ? parseFloat(target.ca1_score) : null;
+          const c2 = target.ca2_score.trim() !== '' ? parseFloat(target.ca2_score) : null;
+          if (c1 !== null || c2 !== null) {
+            target.ca_score = String(Math.round(((c1 ?? 0) + (c2 ?? 0)) * 100) / 100);
+          }
+        }
+
         const caNum = target.ca_score.trim() !== '' ? parseFloat(target.ca_score) : null;
         const examNum = target.exam_score.trim() !== '' ? parseFloat(target.exam_score) : null;
 
@@ -188,7 +206,7 @@ export function TeacherResultsView() {
           target.total_score = tot;
           const { grade, remark } = calculateGradeAndRemark(tot);
           target.grade = grade;
-          if (!target.remark || target.remark === 'Distinction' || target.remark === 'Very Good' || target.remark === 'Credit' || target.remark === 'Pass' || target.remark === 'Fair' || target.remark === 'Fail') {
+          if (!target.remark || ['Distinction', 'Very Good', 'Good', 'Pass', 'Fail', 'Credit', 'Fair', 'Excellent'].includes(target.remark)) {
             target.remark = remark;
           }
         } else {
@@ -214,6 +232,8 @@ export function TeacherResultsView() {
 
     const payloadResults = scores.map((s) => ({
       student_id: s.student_id,
+      ca1_score: s.ca1_score.trim() !== '' ? parseFloat(s.ca1_score) : null,
+      ca2_score: s.ca2_score.trim() !== '' ? parseFloat(s.ca2_score) : null,
       ca_score: s.ca_score.trim() !== '' ? parseFloat(s.ca_score) : null,
       exam_score: s.exam_score.trim() !== '' ? parseFloat(s.exam_score) : null,
       remark: s.remark.trim() || undefined,
@@ -242,7 +262,7 @@ export function TeacherResultsView() {
   };
 
   // Download template
-  const handleDownloadTemplate = (type: UploadType, format: 'pdf' | 'csv' = 'pdf') => {
+  const handleDownloadTemplate = (type: UploadType, format: 'pdf' | 'csv' | 'docx' = 'pdf') => {
     if (!selectedClassId || !selectedCourseId) {
       setFeedback({ type: 'error', message: 'Please select a class and a subject first.' });
       return;
@@ -252,9 +272,15 @@ export function TeacherResultsView() {
       ? window.sessionStorage.getItem('lincoln.token') || window.localStorage.getItem('lincoln.token') || ''
       : '';
 
+    const acceptHeader = format === 'pdf'
+      ? 'application/pdf'
+      : format === 'docx'
+      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      : 'text/csv';
+
     fetch(url, {
       headers: {
-        Accept: format === 'pdf' ? 'application/pdf' : 'text/csv',
+        Accept: acceptHeader,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     })
@@ -267,7 +293,7 @@ export function TeacherResultsView() {
         link.href = window.URL.createObjectURL(blob);
         const selectedClass = classes.find((c) => String(c.id) === selectedClassId);
         const selectedSubject = currentSubjects.find((s) => String(s.id) === selectedCourseId);
-        const ext = format === 'pdf' ? 'pdf' : 'csv';
+        const ext = format === 'pdf' ? 'pdf' : format === 'docx' ? 'docx' : 'csv';
         link.download = `${selectedClass?.name || 'Class'}_${selectedSubject?.code || 'Subject'}_${type.toUpperCase()}_Template.${ext}`;
         document.body.appendChild(link);
         link.click();
@@ -403,6 +429,22 @@ export function TeacherResultsView() {
 
   const currentSubjectObj = currentSubjects.find((s) => String(s.id) === selectedCourseId);
 
+  if (!mounted) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm space-y-4 animate-pulse">
+          <div className="h-6 w-48 bg-zinc-200 rounded-lg" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="h-10 bg-zinc-100 rounded-xl" />
+            <div className="h-10 bg-zinc-100 rounded-xl" />
+            <div className="h-10 bg-zinc-100 rounded-xl" />
+          </div>
+        </div>
+        <div className="bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm h-64 animate-pulse" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* 1. Classroom & Academic Context Selector */}
@@ -507,106 +549,104 @@ export function TeacherResultsView() {
         <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-red-100/40 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative z-10 space-y-6">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="p-2 rounded-xl bg-[#B81D22] text-white shadow-sm">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                </span>
-                <div>
-                  <h3 className="text-lg font-black text-zinc-900 tracking-tight">
-                    Upload Results File (Test &amp; Exam Score Sheet)
-                  </h3>
-                  <p className="text-xs text-zinc-600">
-                    Upload your student marks directly as a spreadsheet file (<span className="font-semibold text-zinc-800">.csv</span> or <span className="font-semibold text-zinc-800">.xlsx</span>). Marks are automatically mapped and visible on the student&apos;s portal immediately.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Template Download Shortcuts arranged exactly per requested format */}
-            <div className="flex flex-col gap-1.5 self-start md:self-auto shrink-0">
-              {/* Row 1: Label + CA (Test) Template */}
-              <div className="flex items-center gap-2.5">
-                <span className="text-xs font-bold text-zinc-500 uppercase tracking-wide">
-                  ROSTER TEMPLATES:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleDownloadTemplate('ca', 'pdf')}
-                  className="px-3.5 py-1.5 rounded-xl border border-purple-200 bg-[#FAF5FF] hover:bg-purple-100/70 text-[#9333EA] text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs hover:shadow active:scale-95"
-                  title="Download printable official CA (Test) score sheet in PDF format"
-                >
-                  <svg className="w-3.5 h-3.5 text-[#9333EA]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  <span>CA (Test) Template</span>
-                </button>
-              </div>
-
-              {/* Row 2: Exam Template + Combined Template */}
-              <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => handleDownloadTemplate('exam', 'pdf')}
-                  className="px-3.5 py-1.5 rounded-xl border border-blue-200 bg-[#F0F8FF] hover:bg-blue-100/70 text-[#0284C7] text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs hover:shadow active:scale-95"
-                  title="Download printable official Terminal Exam score sheet in PDF format"
-                >
-                  <svg className="w-3.5 h-3.5 text-[#0284C7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  <span>Exam Template</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDownloadTemplate('combined', 'pdf')}
-                  className="px-3.5 py-1.5 rounded-xl border border-emerald-200 bg-[#F0FDF4] hover:bg-emerald-100/70 text-[#059669] text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs hover:shadow active:scale-95"
-                  title="Download printable official Combined score sheet in PDF format"
-                >
-                  <svg className="w-3.5 h-3.5 text-[#059669]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  <span>Combined Template</span>
-                </button>
-              </div>
-
-              <div className="text-[11px] text-zinc-400 text-right pr-0.5">
-                PDF format &bull; <button type="button" onClick={() => handleDownloadTemplate('combined', 'csv')} className="text-zinc-500 hover:text-zinc-800 underline font-medium">Download CSV for upload</button>
-              </div>
+          {/* 1. Header (Full Width - No horizontal compression) */}
+          <div className="flex items-start gap-3.5 w-full">
+            <span className="p-2.5 rounded-2xl bg-[#B81D22] text-white shadow-sm shrink-0 mt-0.5">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+            </span>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base sm:text-lg font-black text-zinc-900 tracking-tight leading-snug">
+                Upload Results File (Test &amp; Exam Score Sheet)
+              </h3>
+              <p className="text-xs text-zinc-600 mt-1 leading-relaxed">
+                Upload student marks directly via spreadsheet (<span className="font-semibold text-zinc-800">.csv</span> or <span className="font-semibold text-zinc-800">.xlsx</span>). Marks are automatically mapped and visible on the student&apos;s portal immediately.
+              </p>
             </div>
           </div>
 
-          {/* Upload Mode Selector */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-2 border-t border-zinc-200/60">
-            <span className="text-xs font-bold text-zinc-700">What type of result file are you uploading?</span>
-            <div className="inline-flex rounded-xl bg-zinc-200/70 p-1 gap-1">
-              {[
-                { id: 'combined' as const, label: 'Combined (Test & Exam)', desc: 'Scores CA + Exam together' },
-                { id: 'ca' as const, label: 'Test / CA File Only', desc: 'Continuous assessment (40)' },
-                { id: 'exam' as const, label: 'Terminal Exam File Only', desc: 'Terminal examination (70)' },
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setUploadType(m.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    uploadType === m.id
-                      ? 'bg-white text-[#B81D22] shadow-sm'
-                      : 'text-zinc-600 hover:text-zinc-900'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
+          {/* 2. Dedicated Template Download Toolbar */}
+          <div className="p-3.5 rounded-2xl bg-white/90 border border-zinc-200/80 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-[11px] font-black text-zinc-600 uppercase tracking-wider">
+                Roster Template:
+              </span>
+              <button
+                type="button"
+                onClick={() => handleDownloadTemplate('combined', 'pdf')}
+                className="px-3.5 py-1.5 rounded-xl border border-emerald-200 bg-[#F0FDF4] hover:bg-emerald-100/70 text-[#059669] text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+                title="Download printable official Combined score sheet in PDF format"
+              >
+                <svg className="w-3.5 h-3.5 text-[#059669]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>Download Combined (PDF)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDownloadTemplate('combined', 'docx')}
+                className="px-3.5 py-1.5 rounded-xl border border-blue-200 bg-[#EFF6FF] hover:bg-blue-100/70 text-[#2563EB] text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+                title="Download editable official Combined score sheet in Microsoft Word (.docx) format"
+              >
+                <svg className="w-3.5 h-3.5 text-[#2563EB]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Download Combined (DOCX)</span>
+              </button>
+            </div>
+
+            <div className="text-[11px] text-zinc-500 shrink-0">
+              PDF &amp; Word &bull; <button type="button" onClick={() => handleDownloadTemplate('combined', 'csv')} className="text-[#B81D22] hover:underline font-bold cursor-pointer">Download CSV template</button>
             </div>
           </div>
+
+            {/* Upload Mode Selector - Responsive Card Grid */}
+            <div className="pt-3 border-t border-zinc-200/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-zinc-800">What type of result file are you uploading?</span>
+                <span className="text-[11px] text-zinc-500 hidden sm:inline">Select the score component that matches your file</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {[
+                  { id: 'combined' as const, label: 'Combined Sheet', sub: '1CA + 2CA + Exam (100)' },
+                  { id: '1ca' as const, label: '1st CA Only', sub: 'Test 1 (Max 20)' },
+                  { id: '2ca' as const, label: '2nd CA Only', sub: 'Test 2 (Max 20)' },
+                  { id: 'ca' as const, label: 'Total CA Only', sub: 'Continuous Assmt (40)' },
+                  { id: 'exam' as const, label: 'Terminal Exam Only', sub: 'Examination (60)' },
+                ].map((m) => {
+                  const isSelected = uploadType === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setUploadType(m.id)}
+                      className={`p-3 rounded-2xl text-left border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-white border-[#B81D22] shadow-sm ring-2 ring-[#B81D22]/15'
+                          : 'bg-white/80 border-zinc-200 hover:border-zinc-300 hover:bg-white text-zinc-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className={`text-xs font-black truncate ${isSelected ? 'text-[#B81D22]' : 'text-zinc-800'}`}>
+                          {m.label}
+                        </span>
+                        {isSelected ? (
+                          <span className="w-2 h-2 rounded-full bg-[#B81D22] shrink-0" />
+                        ) : (
+                          <span className="w-2 h-2 rounded-full bg-zinc-200 shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-1 font-medium truncate">{m.sub}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
           {/* Interactive Drag & Drop Zone */}
           <div
-            id={dropZoneId}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -637,7 +677,17 @@ export function TeacherResultsView() {
                 <div>
                   <p className="text-sm font-black text-zinc-900">{selectedFile.name}</p>
                   <p className="text-xs text-zinc-500 mt-0.5">
-                    File size: {(selectedFile.size / 1024).toFixed(1)} KB &bull; Target: {uploadType === 'combined' ? 'Combined Scores' : uploadType === 'ca' ? 'Continuous Assessment (CA)' : 'Terminal Exam'}
+                    File size: {(selectedFile.size / 1024).toFixed(1)} KB &bull; Target: {
+                      uploadType === 'combined'
+                        ? 'Combined Scores'
+                        : uploadType === '1ca'
+                        ? '1st CA (Test 1 / 20)'
+                        : uploadType === '2ca'
+                        ? '2nd CA (Test 2 / 20)'
+                        : uploadType === 'ca'
+                        ? 'Total Continuous Assessment (40)'
+                        : 'Terminal Exam (60)'
+                    }
                   </p>
                 </div>
                 <p className="text-xs text-emerald-700 font-semibold">
@@ -659,8 +709,12 @@ export function TeacherResultsView() {
                     Accepts Microsoft Excel (<span className="font-semibold text-zinc-700">.xlsx</span>), Comma-Separated (<span className="font-semibold text-zinc-700">.csv</span>), or Tab-Delimited (<span className="font-semibold text-zinc-700">.tsv</span>) files.
                   </p>
                 </div>
-                <div className="flex items-center justify-center gap-2 pt-1 text-[11px] text-zinc-400">
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-[11px] text-zinc-400">
                   <span className="px-2 py-0.5 rounded bg-zinc-100 font-mono">student_id_number</span>
+                  <span>&bull;</span>
+                  <span className="px-2 py-0.5 rounded bg-zinc-100 font-mono">ca1_score</span>
+                  <span>&bull;</span>
+                  <span className="px-2 py-0.5 rounded bg-zinc-100 font-mono">ca2_score</span>
                   <span>&bull;</span>
                   <span className="px-2 py-0.5 rounded bg-zinc-100 font-mono">ca_score</span>
                   <span>&bull;</span>
@@ -813,7 +867,7 @@ export function TeacherResultsView() {
               </span>
             </div>
             <p className="text-[11px] text-zinc-500 mt-1">
-              Continuous Assessment (CA / 40) + Terminal Exam (70) = Total (100). All marks saved here are visible to students and downloadable by Admins.
+              Continuous Assessment (1CA / 20 + 2CA / 20 = CA / 40) + Terminal Exam (60) = Total (100). All marks saved here are visible to students and downloadable by Admins.
             </p>
           </div>
 
@@ -856,18 +910,20 @@ export function TeacherResultsView() {
           <div className="p-12 text-center text-xs text-zinc-500">No students registered in this class.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1180px]">
+            <table className="w-full text-left border-collapse min-w-[1260px]">
               <thead>
                 <tr className="bg-zinc-50/90 border-b border-zinc-200 text-[10px] font-black uppercase tracking-wider text-zinc-500">
                   <th className="py-3.5 px-3 w-12 text-center">#</th>
                   <th className="py-3.5 px-4 min-w-[190px]">Student Details</th>
                   <th className="py-3.5 px-3 w-32 whitespace-nowrap">Student ID</th>
-                  <th className="py-3.5 px-3 w-44 text-center whitespace-nowrap">CBT Answer Script</th>
-                  <th className="py-3.5 px-3 w-32 text-center whitespace-nowrap">CA / Test (40)</th>
-                  <th className="py-3.5 px-3 w-32 text-center whitespace-nowrap">Exam (70)</th>
+                  <th className="py-3.5 px-3 w-40 text-center whitespace-nowrap">CBT Script</th>
+                  <th className="py-3.5 px-2.5 w-24 text-center whitespace-nowrap">1st CA (20)</th>
+                  <th className="py-3.5 px-2.5 w-24 text-center whitespace-nowrap">2nd CA (20)</th>
+                  <th className="py-3.5 px-2.5 w-28 text-center whitespace-nowrap">Total CA (40)</th>
+                  <th className="py-3.5 px-2.5 w-28 text-center whitespace-nowrap">Exam (60)</th>
                   <th className="py-3.5 px-3 w-28 text-center whitespace-nowrap">Total (100)</th>
-                  <th className="py-3.5 px-3 w-36 text-center whitespace-nowrap">Letter Grade</th>
-                  <th className="py-3.5 px-4 min-w-[220px]">Remarks</th>
+                  <th className="py-3.5 px-3 w-36 text-center whitespace-nowrap">Grade</th>
+                  <th className="py-3.5 px-4 min-w-[200px]">Remarks</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 text-xs text-zinc-800">
@@ -897,7 +953,7 @@ export function TeacherResultsView() {
                             <svg className="w-3.5 h-3.5 shrink-0 text-[#B81D22]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            <span>Mark Script (PDF)</span>
+                            <span>Mark Script</span>
                           </a>
                           <span
                             className={`text-[9px] font-black uppercase tracking-wider whitespace-nowrap px-2 py-0.5 rounded ${
@@ -913,28 +969,52 @@ export function TeacherResultsView() {
                         <span className="text-[11px] text-zinc-400 italic whitespace-nowrap">No CBT script</span>
                       )}
                     </td>
-                    <td className="py-3.5 px-3 text-center align-middle whitespace-nowrap">
+                    <td className="py-3.5 px-2 text-center align-middle whitespace-nowrap">
+                      <input
+                        type="number"
+                        min="0"
+                        max="20"
+                        step="0.5"
+                        placeholder="0-20"
+                        value={s.ca1_score}
+                        onChange={(e) => handleScoreChange(idx, 'ca1_score', e.target.value)}
+                        className="w-20 mx-auto px-2 py-1.5 text-xs text-center rounded-xl border border-sky-300 bg-sky-50/20 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 font-bold text-zinc-900 shadow-2xs block"
+                      />
+                    </td>
+                    <td className="py-3.5 px-2 text-center align-middle whitespace-nowrap">
+                      <input
+                        type="number"
+                        min="0"
+                        max="20"
+                        step="0.5"
+                        placeholder="0-20"
+                        value={s.ca2_score}
+                        onChange={(e) => handleScoreChange(idx, 'ca2_score', e.target.value)}
+                        className="w-20 mx-auto px-2 py-1.5 text-xs text-center rounded-xl border border-indigo-300 bg-indigo-50/20 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-bold text-zinc-900 shadow-2xs block"
+                      />
+                    </td>
+                    <td className="py-3.5 px-2 text-center align-middle whitespace-nowrap">
                       <input
                         type="number"
                         min="0"
                         max="40"
                         step="0.5"
-                        placeholder="0 - 40"
+                        placeholder="0-40"
                         value={s.ca_score}
                         onChange={(e) => handleScoreChange(idx, 'ca_score', e.target.value)}
-                        className="w-24 mx-auto px-2.5 py-1.5 text-xs text-center rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] font-bold text-zinc-900 shadow-2xs block"
+                        className="w-20 mx-auto px-2 py-1.5 text-xs text-center rounded-xl border border-purple-300 bg-purple-50/20 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 font-bold text-zinc-900 shadow-2xs block"
                       />
                     </td>
-                    <td className="py-3.5 px-3 text-center align-middle whitespace-nowrap">
+                    <td className="py-3.5 px-2 text-center align-middle whitespace-nowrap">
                       <input
                         type="number"
                         min="0"
-                        max="70"
+                        max="60"
                         step="0.5"
-                        placeholder="0 - 70"
+                        placeholder="0-60"
                         value={s.exam_score}
                         onChange={(e) => handleScoreChange(idx, 'exam_score', e.target.value)}
-                        className="w-24 mx-auto px-2.5 py-1.5 text-xs text-center rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] font-bold text-zinc-900 shadow-2xs block"
+                        className="w-20 mx-auto px-2 py-1.5 text-xs text-center rounded-xl border border-zinc-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22] font-bold text-zinc-900 shadow-2xs block"
                       />
                     </td>
                     <td className="py-3.5 px-3 text-center align-middle whitespace-nowrap">

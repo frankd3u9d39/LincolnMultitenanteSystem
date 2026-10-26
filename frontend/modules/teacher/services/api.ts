@@ -200,6 +200,8 @@ export interface TeacherStudentScore {
   email: string;
   student_id_number: string;
   grade_level?: string;
+  ca1_score?: number | null;
+  ca2_score?: number | null;
   ca_score: number | null;
   exam_score: number | null;
   total_score: number | null;
@@ -248,6 +250,8 @@ export function saveTeacherClassResults(
     term: string;
     results: Array<{
       student_id: number;
+      ca1_score?: number | null;
+      ca2_score?: number | null;
       ca_score: number | null;
       exam_score: number | null;
       remark?: string;
@@ -265,7 +269,7 @@ export async function uploadTeacherClassResultsCsv(
   courseId: number,
   term: string,
   file: File,
-  uploadType: 'combined' | 'ca' | 'exam' = 'combined'
+  uploadType: 'combined' | '1ca' | '2ca' | 'ca' | 'exam' = 'combined'
 ) {
   const token = typeof window !== 'undefined'
     ? window.sessionStorage.getItem('lincoln.token') || window.localStorage.getItem('lincoln.token') || ''
@@ -299,8 +303,8 @@ export function getTeacherTemplateUrl(
   classId: number,
   courseId: number,
   term: string,
-  type: 'combined' | 'ca' | 'exam' = 'combined',
-  format: 'pdf' | 'csv' = 'pdf'
+  type: 'combined' | '1ca' | '2ca' | 'ca' | 'exam' = 'combined',
+  format: 'pdf' | 'csv' | 'docx' = 'pdf'
 ) {
   const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
   return `${baseUrl}/teacher/classes/${classId}/results/csv-template?course_id=${courseId}&term=${encodeURIComponent(term)}&type=${type}&format=${format}`;

@@ -136,24 +136,24 @@ export function Sidebar({
           style={{ backgroundColor: primaryColor }}
           className="flex items-center justify-between h-16 px-4 border-b border-white/15"
         >
-          <div className="flex items-center gap-3 overflow-hidden">
+          <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1">
             {!isCollapsed ? (
-              <div className="flex items-center gap-2.5 py-1">
+              <div className="flex items-center gap-2.5 py-1 min-w-0 flex-1">
                 {authUser?.schoolLogo ? (
                   // Custom School Logo
                   <img
                     src={logoUrl}
                     alt={schoolName}
-                    className="h-10 w-auto object-contain max-w-[155px]"
+                    className="h-9 w-9 rounded-lg object-contain bg-white/10 p-0.5 shrink-0"
                   />
                 ) : (
                   // Default Lincoln Logo (White inverted)
                   <Image
                     src="/lincoln-logo.png"
                     alt={schoolName}
-                    width={140}
-                    height={40}
-                    className="h-10 w-auto object-contain max-w-[155px] brightness-0 invert"
+                    width={36}
+                    height={36}
+                    className="h-9 w-9 object-contain brightness-0 invert shrink-0"
                   />
                 )}
                 <div className="h-6 w-px bg-white/30 shrink-0" />
@@ -163,12 +163,18 @@ export function Sidebar({
                 >
                   {schoolBadge}
                 </span>
+                <div className="min-w-0 flex-1 pl-1">
+                  <p className="text-xs font-black tracking-tight text-white leading-tight line-clamp-2" title={schoolName}>
+                    {schoolName}
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="flex items-center justify-center w-10 h-10">
                 <span
                   style={{ color: primaryColor }}
                   className="font-black text-[11px] tracking-wider bg-white px-1.5 py-1 rounded-md shadow-sm"
+                  title={schoolName}
                 >
                   {schoolBadge}
                 </span>

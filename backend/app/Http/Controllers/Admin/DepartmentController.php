@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -40,7 +42,7 @@ class DepartmentController extends Controller
             ->where('role', User::ROLE_TEACHER)
             ->get();
 
-        $data = $allDeptNames->map(function ($name, $index) use ($school, $teachers, $savedDepts) {
+        $data = $allDeptNames->map(function ($name, $index) use ($school, $savedDepts) {
             $courses = Course::where('school_id', $school->id)
                 ->where('department', $name)
                 ->get();
@@ -122,6 +124,7 @@ class DepartmentController extends Controller
         }
 
         $decoded = json_decode($setting->value, true);
+
         return is_array($decoded) ? $decoded : [];
     }
 

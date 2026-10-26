@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -11,7 +13,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -63,7 +64,7 @@ class StudentController extends Controller
             $currentCount = User::where('school_id', $school->id)->where('role', User::ROLE_STUDENT)->count();
             if ($currentCount >= $school->max_students) {
                 return response()->json([
-                    'message' => 'School student enrollment capacity has been reached (maximum ' . $school->max_students . ').',
+                    'message' => 'School student enrollment capacity has been reached (maximum '.$school->max_students.').',
                 ], 422);
             }
         }
@@ -154,6 +155,7 @@ class StudentController extends Controller
     private function payload(User $u): array
     {
         $assignedClass = $u->studentProfile?->classes?->first();
+
         return [
             'id' => $u->id,
             'name' => $u->name,

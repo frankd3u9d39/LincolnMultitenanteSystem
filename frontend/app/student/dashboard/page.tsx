@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useAsync } from '@/modules/superadmin/hooks/useAsync';
 import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
 import { getDashboard } from '@/modules/student/services/api';
+import { useAuth } from '@/lib/auth/AuthProvider';
+import { SchoolInfoBanner } from '@/components/branding/SchoolInfoBanner';
 
 /** Derives a class's live status from "HH:MM - HH:MM" against the current time. */
 function classStatus(time: string): 'completed' | 'ongoing' | 'upcoming' {
@@ -24,6 +26,7 @@ function classStatus(time: string): 'completed' | 'ongoing' | 'upcoming' {
 }
 
 export default function StudentDashboardPage() {
+  const { user } = useAuth();
   const { data, loading, error, reload } = useAsync((signal) => getDashboard(signal), []);
 
   if (loading) {
@@ -38,6 +41,18 @@ export default function StudentDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* School Info Banner */}
+      <SchoolInfoBanner
+        schoolName={user?.schoolName}
+        schoolMotto={user?.schoolMotto}
+        schoolLogo={user?.schoolLogo}
+        schoolCode={user?.schoolCode}
+        schoolAddress={user?.schoolAddress}
+        schoolEmail={user?.schoolEmail}
+        schoolPhone={user?.schoolPhone}
+        variant="card"
+      />
+
       {/* Top Welcome Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-zinc-200">
         <div>
@@ -45,7 +60,7 @@ export default function StudentDashboardPage() {
             Student Portal
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-            Welcome back! Here&apos;s your academic overview for today.
+            Welcome back{user?.name ? `, ${user.name}` : ''}! Here&apos;s your academic overview for today.
           </p>
         </div>
 

@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Course extends Model
@@ -12,9 +15,30 @@ class Course extends Model
     use HasFactory;
 
     protected $fillable = [
-        'school_id', 'teacher_id', 'code', 'name', 'department',
-        'credits', 'term', 'capacity', 'color', 'description',
+        'school_id',
+        'teacher_id',
+        'code',
+        'name',
+        'department',
+        'credits',
+        'term',
+        'capacity',
+        'color',
+        'description',
     ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'credits' => 'integer',
+            'capacity' => 'integer',
+        ];
+    }
 
     public function school(): BelongsTo
     {
@@ -56,7 +80,7 @@ class Course extends Model
         return max(0, $this->capacity - $this->enrolledCount());
     }
 
-    public function classes()
+    public function classes(): BelongsToMany
     {
         return $this->belongsToMany(SchoolClass::class, 'class_subject', 'course_id', 'school_class_id')
             ->withPivot('teacher_id')

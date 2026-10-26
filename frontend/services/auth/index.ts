@@ -20,6 +20,10 @@ export interface AuthUser {
   schoolName: string | null;
   schoolCode: string | null;
   schoolLogo?: string | null;
+  schoolMotto?: string | null;
+  schoolAddress?: string | null;
+  schoolEmail?: string | null;
+  schoolPhone?: string | null;
   schoolTheme?: SchoolTheme | null;
   mfaEnabled: boolean;
 }

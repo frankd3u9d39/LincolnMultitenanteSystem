@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -70,7 +72,7 @@ class AttendanceOverviewController extends Controller
                     $flaggedStudents[] = [
                         'id' => $stUser->id,
                         'name' => $stUser->name,
-                        'idNumber' => $stUser->studentProfile?->student_id_number ?? ('STD-' . $stUser->id),
+                        'idNumber' => $stUser->studentProfile?->student_id_number ?? ('STD-'.$stUser->id),
                         'course' => 'Enrolled Courses',
                         'rate' => $sRate,
                         'consecutiveAbsences' => AttendanceRecord::where('school_id', $school->id)

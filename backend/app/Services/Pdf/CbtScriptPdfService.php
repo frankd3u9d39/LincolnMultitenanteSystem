@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Pdf;
 
 use App\Models\Assignment;
@@ -32,7 +34,7 @@ class CbtScriptPdfService
         $schoolName = $school?->name ?? 'Lincoln College of Science Management & Technology';
 
         $studentProfile = $student->studentProfile;
-        $studentIdNumber = $studentProfile?->student_id_number ?? ('LC-STD-' . str_pad($student->id, 4, '0', STR_PAD_LEFT));
+        $studentIdNumber = $studentProfile?->student_id_number ?? ('LC-STD-'.str_pad((string) $student->id, 4, '0', STR_PAD_LEFT));
 
         $pdf = new CbtPdf('P', 'mm', 'A4');
         $pdf->AliasNbPages();
@@ -90,10 +92,10 @@ class CbtScriptPdfService
             $pdf->SetDrawColor(203, 213, 225);
             $pdf->SetTextColor(30, 41, 59);
             $pdf->SetFont('Arial', 'B', 8.5);
-            $pdf->Cell(140, 6, "  Question {$qNum} of " . count($questions), 'LTB', 0, 'L', true);
+            $pdf->Cell(140, 6, "  Question {$qNum} of ".count($questions), 'LTB', 0, 'L', true);
             $pdf->SetFont('Arial', '', 8);
             $pdf->SetTextColor(100, 116, 139);
-            $pdf->Cell(0, 6, "Mark Weight: 6.0 Marks  ", 'RTB', 1, 'R', true);
+            $pdf->Cell(0, 6, 'Mark Weight: 6.0 Marks  ', 'RTB', 1, 'R', true);
 
             // Question Text
             $pdf->SetTextColor(15, 23, 42);
@@ -107,10 +109,10 @@ class CbtScriptPdfService
                 $pdf->Cell(45, 6, "  Candidate Selection: [ Option {$selectedOpt} ]", 'L', 0, 'L');
                 $pdf->SetFont('Arial', '', 8);
                 $pdf->SetTextColor(51, 65, 85);
-                $pdf->Cell(0, 6, $this->sanitizeText("- " . substr($optText, 0, 85)), 'R', 1, 'L');
+                $pdf->Cell(0, 6, $this->sanitizeText('- '.substr($optText, 0, 85)), 'R', 1, 'L');
             } else {
                 $pdf->SetTextColor(185, 28, 28); // Red
-                $pdf->Cell(0, 6, "  Candidate Selection: [ No answer selected / Left Blank ]", 'LR', 1, 'L');
+                $pdf->Cell(0, 6, '  Candidate Selection: [ No answer selected / Left Blank ]', 'LR', 1, 'L');
             }
 
             // Teacher marking line
@@ -157,8 +159,8 @@ class CbtScriptPdfService
             time()
         );
 
-        $absolutePath = $uploadDir . DIRECTORY_SEPARATOR . $filename;
-        $relativePath = 'uploads/cbt_submissions/' . $filename;
+        $absolutePath = $uploadDir.DIRECTORY_SEPARATOR.$filename;
+        $relativePath = 'uploads/cbt_submissions/'.$filename;
 
         $pdf->Output('F', $absolutePath);
 
@@ -173,7 +175,10 @@ class CbtScriptPdfService
 
     private function sanitizeText(?string $str): string
     {
-        if ($str === null) return '';
+        if ($str === null) {
+            return '';
+        }
+
         return iconv('UTF-8', 'windows-1252//TRANSLIT', $str) ?: $str;
     }
 }
@@ -184,11 +189,17 @@ class CbtScriptPdfService
 class CbtPdf extends \FPDF
 {
     private string $schoolName = '';
+
     private string $examTitle = '';
+
     private string $courseInfo = '';
+
     private string $studentName = '';
+
     private string $studentIdNumber = '';
+
     private string $submissionTime = '';
+
     private ?string $reason = null;
 
     public function setDocumentHeader(
@@ -239,14 +250,14 @@ class CbtPdf extends \FPDF
         $this->SetTextColor(30, 41, 59);
 
         $width = ($this->GetPageWidth() - 24) / 3;
-        $this->Cell($width, 4.5, 'Candidate: ' . $this->studentName, 0, 0, 'L');
-        $this->Cell($width, 4.5, 'Student ID: ' . $this->studentIdNumber, 0, 0, 'L');
-        $this->Cell($width, 4.5, 'Subject: ' . $this->courseInfo, 0, 1, 'L');
+        $this->Cell($width, 4.5, 'Candidate: '.$this->studentName, 0, 0, 'L');
+        $this->Cell($width, 4.5, 'Student ID: '.$this->studentIdNumber, 0, 0, 'L');
+        $this->Cell($width, 4.5, 'Subject: '.$this->courseInfo, 0, 1, 'L');
 
         $this->SetFont('Arial', '', 7.5);
         $this->SetTextColor(71, 85, 105);
-        $this->Cell($width, 4.5, 'Exam: ' . substr($this->examTitle, 0, 32), 0, 0, 'L');
-        $this->Cell($width, 4.5, 'Submitted: ' . $this->submissionTime, 0, 0, 'L');
+        $this->Cell($width, 4.5, 'Exam: '.substr($this->examTitle, 0, 32), 0, 0, 'L');
+        $this->Cell($width, 4.5, 'Submitted: '.$this->submissionTime, 0, 0, 'L');
         $this->Cell($width, 4.5, 'Status: Pending Teacher Marking', 0, 1, 'L');
 
         $this->Ln(3);
@@ -259,7 +270,7 @@ class CbtPdf extends \FPDF
         $this->SetTextColor(148, 163, 184);
 
         $pageWidth = $this->GetPageWidth() - 24;
-        $this->Cell($pageWidth / 2, 8, 'Lincoln SMTS Examination Submissions System &bull; ' . date('d M Y, H:i'), 0, 0, 'L');
-        $this->Cell($pageWidth / 2, 8, 'Page ' . $this->PageNo() . ' of {nb}', 0, 0, 'R');
+        $this->Cell($pageWidth / 2, 8, 'Lincoln SMTS Examination Submissions System &bull; '.date('d M Y, H:i'), 0, 0, 'L');
+        $this->Cell($pageWidth / 2, 8, 'Page '.$this->PageNo().' of {nb}', 0, 0, 'R');
     }
 }

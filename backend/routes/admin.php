@@ -94,6 +94,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth:sanctum', 'admin'])->g
     Route::post('/classes/{schoolClass}/results/csv-upload', [ClassResultController::class, 'uploadCsv'])->name('classes.results.csv-upload');
     Route::get('/classes/{schoolClass}/results/csv-template', [ClassResultController::class, 'csvTemplate'])->name('classes.results.csv-template');
     Route::get('/classes/{schoolClass}/results/export', [ClassResultController::class, 'export'])->name('classes.results.export');
+    Route::get('/classes/{schoolClass}/performance-reports/zip', [ClassResultController::class, 'downloadClassPerformanceReportsZip'])->name('classes.performance-reports.zip');
+    Route::get('/students/{student}/performance-report/pdf', [ClassResultController::class, 'downloadPupilPerformanceReportPdf'])->name('students.performance-report.pdf');
 
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 

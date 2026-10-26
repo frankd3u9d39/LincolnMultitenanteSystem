@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -35,6 +38,7 @@ class School extends Model
 
     protected $fillable = [
         'name',
+        'motto',
         'code',
         'slug',
         'domain',
@@ -101,7 +105,7 @@ class School extends Model
     }
 
     /** The most recent daily metrics snapshot for this tenant. */
-    public function latestMetric()
+    public function latestMetric(): HasOne
     {
         return $this->hasOne(SchoolMetric::class)->latestOfMany('metric_date');
     }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -73,7 +75,7 @@ class AnnouncementController extends Controller
                 StudentNotification::create([
                     'school_id' => $student->school_id ?: $schoolId,
                     'student_id' => $student->id,
-                    'title' => $prefix . $data['title'],
+                    'title' => $prefix.$data['title'],
                     'message' => $data['content'],
                     'type' => 'Campus',
                     'is_read' => false,

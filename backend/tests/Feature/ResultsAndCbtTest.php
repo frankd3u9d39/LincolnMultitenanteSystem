@@ -19,11 +19,17 @@ class ResultsAndCbtTest extends TestCase
     use RefreshDatabase;
 
     private School $cbtSchool;
+
     private School $paperSchool;
+
     private User $superAdmin;
+
     private User $cbtAdmin;
+
     private User $cbtStudent;
+
     private SchoolClass $schoolClass;
+
     private Course $course;
 
     protected function setUp(): void
@@ -429,9 +435,9 @@ class ResultsAndCbtTest extends TestCase
         $submitResponse->assertOk();
         $submitResponse->assertJson([
             'result' => [
-                'correctCount' => count($questions),
+                'status' => 'pending_teacher_marking',
+                'hasSubmitted' => true,
                 'totalQuestions' => count($questions),
-                'examScore' => 60,
             ],
         ]);
 

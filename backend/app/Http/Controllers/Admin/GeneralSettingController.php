@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -114,7 +116,7 @@ class GeneralSettingController extends Controller
         $school = $request->user()->school;
         $file = $request->file('logo');
         $extension = $file->getClientOriginalExtension() ?: 'png';
-        $filename = 'logo_' . Str::slug($school->code) . '_' . time() . '.' . $extension;
+        $filename = 'logo_'.Str::slug($school->code).'_'.time().'.'.$extension;
 
         $targetDir = public_path('uploads/logos');
         if (! file_exists($targetDir)) {
@@ -122,7 +124,7 @@ class GeneralSettingController extends Controller
         }
 
         $file->move($targetDir, $filename);
-        $school->logo_url = '/uploads/logos/' . $filename;
+        $school->logo_url = '/uploads/logos/'.$filename;
         $school->save();
 
         return response()->json([

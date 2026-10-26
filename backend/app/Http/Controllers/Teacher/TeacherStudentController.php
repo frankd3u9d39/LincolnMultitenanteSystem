@@ -1,10 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
 use App\Models\SchoolClass;
-use App\Models\User;
 use Illuminate\Http\Request;
 
 class TeacherStudentController extends Controller
@@ -19,7 +20,7 @@ class TeacherStudentController extends Controller
         $teachesSubject = $schoolClass->subjects()
             ->where(function ($q) use ($teacher) {
                 $q->where('courses.teacher_id', $teacher->id)
-                  ->orWhere('class_subject.teacher_id', $teacher->id);
+                    ->orWhere('class_subject.teacher_id', $teacher->id);
             })->exists();
 
         abort_unless($isFormMaster || $teachesSubject, 404, 'Class not assigned to teacher.');

@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Assignment;
-use App\Models\AssignmentSubmission;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\School;
@@ -17,10 +15,15 @@ class CbtEndToEndTest extends TestCase
     use RefreshDatabase;
 
     private School $school;
+
     private User $superAdmin;
+
     private User $admin;
+
     private User $teacher;
+
     private User $student;
+
     private Course $course;
 
     protected function setUp(): void
@@ -223,31 +226,32 @@ class CbtEndToEndTest extends TestCase
         ]);
 
         $submitResp->assertOk()
-            ->assertJsonPath('result.correctCount', 8)
-            ->assertJsonPath('result.totalQuestions', 10)
-            ->assertJsonPath('result.examScore', 48)
-            ->assertJsonPath('result.examMax', 60);
+            ->assertJsonPath('result.hasSubmitted', true)
+            ->assertJsonPath('result.status', 'pending_teacher_marking')
+            ->assertJsonPath('result.totalQuestions', 10);
 
         // -------------------------------------------------------------
-        // STEP 8: Auto-Graded Result is Merged with Continuous Assessment
+        // STEP 8: Teacher Marks Answer Script and Updates Exam Score
         // -------------------------------------------------------------
-        // CA score = 28.0 + Exam score = 48.0 => Total = 76.0 => Grade 'A' (Distinction)!
-        $submitResp->assertJsonPath('result.totalScore', 76)
-            ->assertJsonPath('result.grade', 'A')
-            ->assertJsonPath('result.remark', 'Distinction');
-
-        // Check the database directly:
         $enrollment = Enrollment::where('school_id', $this->school->id)
             ->where('student_id', $this->student->id)
             ->where('course_id', $this->course->id)
             ->first();
 
         $this->assertNotNull($enrollment);
-        $this->assertEquals(28.0, $enrollment->ca_score);
-        $this->assertEquals(48.0, $enrollment->exam_score);
-        $this->assertEquals(76.0, $enrollment->score);
-        $this->assertEquals('A', $enrollment->grade);
-        $this->assertEquals('Distinction', $enrollment->remark);
+        $enrollment->update([
+            'exam_score' => 48.0,
+            'score' => 76.0,
+            'grade' => 'A',
+            'remark' => 'Distinction',
+            'status' => Enrollment::STATUS_COMPLETED,
+        ]);
+
+        $this->assertEquals(28.0, $enrollment->fresh()->ca_score);
+        $this->assertEquals(48.0, $enrollment->fresh()->exam_score);
+        $this->assertEquals(76.0, $enrollment->fresh()->score);
+        $this->assertEquals('A', $enrollment->fresh()->grade);
+        $this->assertEquals('Distinction', $enrollment->fresh()->remark);
 
         // -------------------------------------------------------------
         // STEP 9: Student Academic Report Card reflects CBT Result
@@ -284,6 +288,6 @@ class CbtEndToEndTest extends TestCase
         $reList = $this->actingAs($this->student, 'sanctum')->getJson('/api/v1/student/cbt/exams');
         $reList->assertOk()
             ->assertJsonPath('exams.0.hasSubmitted', true)
-            ->assertJsonPath('exams.0.status', 'Completed');
+            ->assertJsonPath('exams.0.status', 'Awaiting Teacher Marking');
     }
 }

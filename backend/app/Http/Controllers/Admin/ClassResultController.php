@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -8,9 +10,11 @@ use App\Models\Enrollment;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\Pdf\ResultPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -31,7 +35,7 @@ class ClassResultController extends Controller
         $school = $request->user()->school;
 
         $subjects = $schoolClass->subjects()->get(['courses.id', 'courses.code', 'courses.name']);
-        
+
         // If the class has no specific assigned subjects, fallback to all school courses
         if ($subjects->isEmpty()) {
             $subjects = Course::where('school_id', $school->id)->get(['id', 'code', 'name']);
@@ -73,17 +77,112 @@ class ClassResultController extends Controller
                         'student_profile_id' => $u->studentProfile?->id,
                         'name' => $u->name,
                         'email' => $u->email,
-                        'student_id_number' => $u->studentProfile?->student_id_number ?? ('LC-STD-' . str_pad($u->id, 4, '0', STR_PAD_LEFT)),
+                        'student_id_number' => $u->studentProfile?->student_id_number ?? ('LC-STD-'.str_pad((string) $u->id, 4, '0', STR_PAD_LEFT)),
                         'grade_level' => $u->studentProfile?->grade_level ?? 'Secondary',
                     ];
                 });
             $students = $fallbackStudents;
         }
 
+        $isAllSubjects = ($courseId === 'all' || $courseId === null || $courseId === '');
+
         $studentIds = $students->pluck('student_id')->filter()->values();
 
-        // Fetch existing enrollment results for this course and term
+        // Automatically ensure students in this class are enrolled in all class subjects
+        if ($subjects->isNotEmpty() && $studentIds->isNotEmpty()) {
+            foreach ($studentIds as $sId) {
+                foreach ($subjects as $sub) {
+                    Enrollment::firstOrCreate(
+                        [
+                            'school_id' => $school->id,
+                            'student_id' => $sId,
+                            'course_id' => $sub->id,
+                            'school_class_id' => $schoolClass->id,
+                            'term' => $term,
+                        ],
+                        [
+                            'status' => Enrollment::STATUS_IN_PROGRESS,
+                            'progress' => 0,
+                        ]
+                    );
+                }
+            }
+        }
+
+        // Fetch existing enrollment results
         $enrollments = collect();
+        if ($isAllSubjects) {
+            $allEnrollments = Enrollment::where('school_id', $school->id)
+                ->where('term', $term)
+                ->whereIn('student_id', $studentIds)
+                ->get()
+                ->groupBy('student_id');
+
+            $results = $students->map(function ($s) use ($allEnrollments, $subjects) {
+                $userEnrollments = $allEnrollments->get($s['student_id'], collect());
+                $graded = $userEnrollments->filter(fn ($e) => $e->score !== null);
+                
+                $avgCa1 = $graded->whereNotNull('ca1_score')->avg('ca1_score');
+                $avgCa2 = $graded->whereNotNull('ca2_score')->avg('ca2_score');
+                $avgCa = $graded->whereNotNull('ca_score')->avg('ca_score');
+                $avgExam = $graded->whereNotNull('exam_score')->avg('exam_score');
+                $avgTotal = $graded->avg('score');
+
+                $roundedTotal = $avgTotal !== null ? round((float) $avgTotal, 1) : null;
+                $grade = $roundedTotal !== null ? $this->calculateGrade($roundedTotal) : null;
+                $remark = $grade !== null ? $this->defaultRemark($grade) : null;
+
+                return [
+                    'student_id' => $s['student_id'],
+                    'student_profile_id' => $s['student_profile_id'],
+                    'name' => $s['name'],
+                    'email' => $s['email'],
+                    'student_id_number' => $s['student_id_number'],
+                    'grade_level' => $s['grade_level'],
+                    'ca1_score' => $avgCa1 !== null ? round((float) $avgCa1, 1) : null,
+                    'ca2_score' => $avgCa2 !== null ? round((float) $avgCa2, 1) : null,
+                    'ca_score' => $avgCa !== null ? round((float) $avgCa, 1) : null,
+                    'exam_score' => $avgExam !== null ? round((float) $avgExam, 1) : null,
+                    'total_score' => $roundedTotal,
+                    'grade' => $grade,
+                    'remark' => $remark,
+                    'subjects_count' => $userEnrollments->count(),
+                    'graded_subjects_count' => $graded->count(),
+                    'updated_at' => $userEnrollments->max('updated_at')?->toIso8601String(),
+                ];
+            });
+
+            $subjectTeacherName = 'All Assigned Subject Teachers';
+            $gradedCount = $results->filter(fn ($r) => $r['total_score'] !== null)->count();
+            $totalStudents = $results->count();
+            $completionStatus = $totalStudents === 0 ? 'empty' : ($gradedCount === $totalStudents ? 'completed' : ($gradedCount > 0 ? 'in_progress' : 'pending'));
+
+            return response()->json([
+                'class' => [
+                    'id' => $schoolClass->id,
+                    'name' => $schoolClass->name,
+                    'code' => $schoolClass->code,
+                    'room' => $schoolClass->room,
+                    'form_master' => $schoolClass->teacher?->name ?? 'Unassigned',
+                ],
+                'subjects' => $subjects,
+                'selected_course_id' => 'all',
+                'term' => $term,
+                'meta' => [
+                    'form_master' => $schoolClass->teacher?->name ?? 'Unassigned',
+                    'subject_teacher' => $subjectTeacherName,
+                    'total_students' => $totalStudents,
+                    'graded_count' => $gradedCount,
+                    'pending_count' => $totalStudents - $gradedCount,
+                    'completion_status' => $completionStatus,
+                    'is_all_subjects' => true,
+                    'last_updated_at' => (string) (Enrollment::where('school_id', $school->id)->where('term', $term)->whereIn('student_id', $studentIds)->max('updated_at') ?? ''),
+                ],
+                'students' => $results->values(),
+            ]);
+        }
+
+        // Single specific subject
         if ($courseId && $studentIds->isNotEmpty()) {
             $enrollments = Enrollment::where('school_id', $school->id)
                 ->where('course_id', $courseId)
@@ -103,6 +202,8 @@ class ClassResultController extends Controller
                 'email' => $s['email'],
                 'student_id_number' => $s['student_id_number'],
                 'grade_level' => $s['grade_level'],
+                'ca1_score' => $enrollment?->ca1_score !== null ? (float) $enrollment->ca1_score : null,
+                'ca2_score' => $enrollment?->ca2_score !== null ? (float) $enrollment->ca2_score : null,
                 'ca_score' => $enrollment?->ca_score !== null ? (float) $enrollment->ca_score : null,
                 'exam_score' => $enrollment?->exam_score !== null ? (float) $enrollment->exam_score : null,
                 'total_score' => $enrollment?->score !== null ? (float) $enrollment->score : null,
@@ -137,7 +238,7 @@ class ClassResultController extends Controller
                 'form_master' => $schoolClass->teacher?->name ?? 'Unassigned',
             ],
             'subjects' => $subjects,
-            'selected_course_id' => $courseId ? (int) $courseId : null,
+            'selected_course_id' => (int) $courseId,
             'term' => $term,
             'meta' => [
                 'form_master' => $schoolClass->teacher?->name ?? 'Unassigned',
@@ -146,6 +247,7 @@ class ClassResultController extends Controller
                 'graded_count' => $gradedCount,
                 'pending_count' => $totalStudents - $gradedCount,
                 'completion_status' => $completionStatus,
+                'is_all_subjects' => false,
                 'last_updated_at' => $enrollments->max('updated_at')?->toIso8601String(),
             ],
             'students' => $results->values(),
@@ -186,7 +288,7 @@ class ClassResultController extends Controller
                 $total = round($ca + $exam, 2);
 
                 $grade = $this->calculateGrade($total);
-                $remark = !empty($item['remark']) ? $item['remark'] : $this->defaultRemark($grade);
+                $remark = ! empty($item['remark']) ? $item['remark'] : $this->defaultRemark($grade);
 
                 Enrollment::updateOrCreate(
                     [
@@ -242,6 +344,7 @@ class ClassResultController extends Controller
         $header = fgetcsv($fileHandle);
         if (! $header) {
             fclose($fileHandle);
+
             return response()->json(['message' => 'CSV file is empty.'], 422);
         }
 
@@ -292,7 +395,8 @@ class ClassResultController extends Controller
             }
 
             if (! $user) {
-                $errors[] = "Row {$rowNum}: Student not found (" . ($idNumber ?? $email ?? 'unspecified') . ")";
+                $errors[] = "Row {$rowNum}: Student not found (".($idNumber ?? $email ?? 'unspecified').')';
+
                 continue;
             }
 
@@ -302,7 +406,7 @@ class ClassResultController extends Controller
 
             $total = round($caVal + $examVal, 2);
             $grade = $this->calculateGrade($total);
-            $finalRemark = !empty($remarkVal) ? $remarkVal : $this->defaultRemark($grade);
+            $finalRemark = ! empty($remarkVal) ? $remarkVal : $this->defaultRemark($grade);
 
             Enrollment::updateOrCreate(
                 [
@@ -338,7 +442,7 @@ class ClassResultController extends Controller
     /**
      * Generates a pre-filled CSV template for entering student marks in this class.
      */
-    public function csvTemplate(Request $request, SchoolClass $schoolClass): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function csvTemplate(Request $request, SchoolClass $schoolClass): StreamedResponse
     {
         $school = $request->user()->school;
 
@@ -365,7 +469,7 @@ class ClassResultController extends Controller
                         'student_id' => $u->id,
                         'name' => $u->name,
                         'email' => $u->email,
-                        'student_id_number' => $u->studentProfile?->student_id_number ?? ('LC-STD-' . str_pad($u->id, 4, '0', STR_PAD_LEFT)),
+                        'student_id_number' => $u->studentProfile?->student_id_number ?? ('LC-STD-'.str_pad((string) $u->id, 4, '0', STR_PAD_LEFT)),
                     ];
                 });
         }
@@ -411,7 +515,7 @@ class ClassResultController extends Controller
     /**
      * Downloads/exports the complete results broadsheet for a class and subject as PDF or CSV.
      */
-    public function export(Request $request, SchoolClass $schoolClass): \Symfony\Component\HttpFoundation\Response
+    public function export(Request $request, SchoolClass $schoolClass): Response
     {
         $school = $request->user()->school;
         $courseId = $request->query('course_id');
@@ -427,10 +531,11 @@ class ClassResultController extends Controller
                 ->take(30)
                 ->get()
                 ->map(function (User $u) {
-                    $obj = new \stdClass();
+                    $obj = new \stdClass;
                     $obj->user_id = $u->id;
-                    $obj->student_id_number = $u->studentProfile?->student_id_number ?? ('LC-STD-' . str_pad($u->id, 4, '0', STR_PAD_LEFT));
+                    $obj->student_id_number = $u->studentProfile?->student_id_number ?? ('LC-STD-'.str_pad((string) $u->id, 4, '0', STR_PAD_LEFT));
                     $obj->user = $u;
+
                     return $obj;
                 });
         }
@@ -448,7 +553,7 @@ class ClassResultController extends Controller
         }
 
         if ($format === 'pdf') {
-            $pdfService = new \App\Services\Pdf\ResultPdfService();
+            $pdfService = new ResultPdfService;
             $pdfData = $pdfService->generateBroadsheetPdf(
                 $schoolClass,
                 $course,
@@ -532,5 +637,115 @@ class ClassResultController extends Controller
             'E' => 'Fair',
             default => 'Fail',
         };
+    }
+
+    /**
+     * Downloads official Pupil's Performance Report PDF for a student.
+     * Accessible exclusively by school Administrators.
+     */
+    public function downloadPupilPerformanceReportPdf(Request $request, int|string $student): Response
+    {
+        $school = $request->user()->school;
+
+        $studentUser = User::where('school_id', $school->id)
+            ->where(function ($q) use ($student) {
+                $q->where('id', $student)
+                    ->orWhereHas('studentProfile', function ($sq) use ($student) {
+                        $sq->where('id', $student)->orWhere('student_id_number', $student);
+                    });
+            })
+            ->firstOrFail();
+
+        $term = $request->query('term', $school->academic_year_current ?? '2025/2026 (2nd Term)');
+
+        $reportService = new \App\Services\Result\PupilPerformanceReportService;
+        $reportData = $reportService->getReportData($studentUser, $term);
+
+        $pdfService = new ResultPdfService;
+        $pdfData = $pdfService->generatePupilPerformanceReportPdf($reportData);
+
+        $pdfFileName = sprintf(
+            '%s_%s_Performance_Report.pdf',
+            preg_replace('/[^a-zA-Z0-9_-]/', '_', $studentUser->name),
+            preg_replace('/[^a-zA-Z0-9_-]/', '_', $term)
+        );
+
+        return response($pdfData, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"{$pdfFileName}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+        ]);
+    }
+
+    /**
+     * Downloads all student Pupil's Performance Reports for an entire class as a ZIP folder.
+     * Accessible exclusively by school Administrators.
+     */
+    public function downloadClassPerformanceReportsZip(Request $request, SchoolClass $schoolClass): Response
+    {
+        $school = $request->user()->school;
+
+        if ($schoolClass->school_id !== $school->id) {
+            abort(403, 'Unauthorized class access.');
+        }
+
+        $term = $request->query('term', $school->academic_year_current ?? 'First Term 2025/2026');
+
+        $students = $schoolClass->students()
+            ->with('user')
+            ->get();
+
+        if ($students->isEmpty()) {
+            abort(404, 'No students enrolled in this class to generate report cards for.');
+        }
+
+        $reportService = new \App\Services\Result\PupilPerformanceReportService;
+        $pdfService = new ResultPdfService;
+
+        $tempZipPath = tempnam(sys_get_temp_dir(), 'class_reports_');
+        $zip = new \ZipArchive;
+
+        if ($zip->open($tempZipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            abort(500, 'Unable to create ZIP archive.');
+        }
+
+        foreach ($students as $studentProfile) {
+            $studentUser = $studentProfile->user;
+            if (! $studentUser) {
+                continue;
+            }
+
+            try {
+                $reportData = $reportService->getReportData($studentUser, $term);
+                $pdfData = $pdfService->generatePupilPerformanceReportPdf($reportData);
+
+                $admission = $studentProfile->student_id_number ?: $studentUser->id;
+                $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $studentUser->name);
+                $safeAdm = preg_replace('/[^a-zA-Z0-9_-]/', '_', (string) $admission);
+                $filename = "{$safeAdm}_{$safeName}_Report_Card.pdf";
+
+                $zip->addFromString($filename, $pdfData);
+            } catch (\Throwable $e) {
+                // Continue with other students if one fails
+                continue;
+            }
+        }
+
+        $zip->close();
+
+        $zipContent = file_get_contents($tempZipPath);
+        @unlink($tempZipPath);
+
+        $safeClassName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $schoolClass->name);
+        $safeTerm = preg_replace('/[^a-zA-Z0-9_-]/', '_', $term);
+        $zipFileName = "{$safeClassName}_{$safeTerm}_Pupils_Reports.zip";
+
+        return response($zipContent, 200, [
+            'Content-Type' => 'application/zip',
+            'Content-Disposition' => "attachment; filename=\"{$zipFileName}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+        ]);
     }
 }

@@ -77,11 +77,64 @@ export function submitAssignment(submissionId: number, submissionText?: string) 
   }).then((r) => r.data);
 }
 
+export interface PupilPerformanceSubject {
+  id: number;
+  name: string;
+  code: string;
+  ca1: number | null;
+  ca2: number | null;
+  exam: number | null;
+  total: number | null;
+  grade: string;
+  remark: string;
+}
+
+export interface PupilPerformanceReport {
+  school: {
+    name: string;
+    motto: string;
+    address: string;
+    email: string;
+    phone: string;
+  };
+  meta: {
+    pupil_name: string;
+    admission_no: string;
+    class_name: string;
+    academic_session: string;
+    class_population: number;
+    final_grade: string;
+    final_position: string;
+    final_average: number;
+    class_average: number;
+    highest_average: number;
+    subjects_count: number;
+  };
+  subjects: PupilPerformanceSubject[];
+  grade_details: string;
+  behavioral_traits: {
+    personal_social: Array<{ name: string; rating: string }>;
+    practical_skills: Array<{ name: string; rating: string }>;
+    rating_scale: Record<string, string>;
+  };
+  comments: {
+    principal_comment: string;
+    teacher_comment: string;
+    form_teacher_name: string;
+    next_term_begins: string;
+    signature_status: string;
+  };
+  available_terms: string[];
+  selected_term: string;
+}
+
 export interface ResultCourse {
   id: number;
   name: string;
   code: string;
   credits: number;
+  ca1_score?: number | null;
+  ca2_score?: number | null;
   ca_score?: number | null;
   exam_score?: number | null;
   grade: string;
@@ -90,12 +143,24 @@ export interface ResultCourse {
 }
 
 export interface ResultsReport {
+  report?: PupilPerformanceReport;
   summary: { cgpa: number; totalCredits: number; standing: string };
   history: Array<{ term: string; tgpa: number; courses: ResultCourse[] }>;
 }
 
-export function getResults(signal?: AbortSignal) {
-  return api<{ data: ResultsReport }>('/student/results', { signal }).then((r) => r.data);
+export function getResults(termOrSignal?: string | AbortSignal, signal?: AbortSignal) {
+  let termParam: string | undefined;
+  let abortSignal: AbortSignal | undefined;
+
+  if (typeof termOrSignal === 'string') {
+    termParam = termOrSignal;
+    abortSignal = signal;
+  } else {
+    abortSignal = termOrSignal;
+  }
+
+  const query = termParam ? { term: termParam } : undefined;
+  return api<{ data: ResultsReport }>('/student/results', { signal: abortSignal, query }).then((r) => r.data);
 }
 
 export interface TimetableEntry {

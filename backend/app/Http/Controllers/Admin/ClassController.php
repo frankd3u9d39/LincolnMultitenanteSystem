@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -28,50 +30,50 @@ class ClassController extends Controller
         $teacherIds = $teachersMap->keys();
 
         $classes = SchoolClass::where(function ($q) use ($teacherIds) {
-                $q->whereIn('teacher_id', $teacherIds)->orWhereNull('teacher_id');
-            })
+            $q->whereIn('teacher_id', $teacherIds)->orWhereNull('teacher_id');
+        })
             ->withCount('students')
             ->with([
-                'teacher:id,name',
-                'subjects' => function ($q) {
-                    $q->select('courses.id', 'courses.code', 'courses.name', 'courses.department', 'courses.teacher_id')
-                        ->with('teacher:id,name');
-                },
-            ])
+            'teacher:id,name',
+            'subjects' => function ($q) {
+                $q->select('courses.id', 'courses.code', 'courses.name', 'courses.department', 'courses.teacher_id')
+                    ->with('teacher:id,name');
+            },
+        ])
             ->orderBy('name')
             ->get()
             ->map(fn (SchoolClass $c) => [
-                'id' => $c->id,
-                'name' => $c->name,
-                'code' => $c->code,
-                'room' => $c->room,
-                'schedule' => $c->schedule,
-                'teacher' => $c->teacher?->name ?? 'Unassigned',
-                'teacherId' => $c->teacher_id,
-                'studentCount' => $c->students_count,
-                'subjects' => $c->subjects->map(function ($s) use ($teachersMap) {
-                    $pivotTeacherId = $s->pivot?->teacher_id;
-                    $teacherName = null;
-                    $teacherId = null;
+            'id' => $c->id,
+            'name' => $c->name,
+            'code' => $c->code,
+            'room' => $c->room,
+            'schedule' => $c->schedule,
+            'teacher' => $c->teacher?->name ?? 'Unassigned',
+            'teacherId' => $c->teacher_id,
+            'studentCount' => $c->students_count,
+            'subjects' => $c->subjects->map(function ($s) use ($teachersMap) {
+                $pivotTeacherId = $s->pivot?->teacher_id;
+                $teacherName = null;
+                $teacherId = null;
 
-                    if ($pivotTeacherId && isset($teachersMap[$pivotTeacherId])) {
-                        $teacherName = $teachersMap[$pivotTeacherId]->name;
-                        $teacherId = $pivotTeacherId;
-                    } elseif ($s->teacher) {
-                        $teacherName = $s->teacher->name;
-                        $teacherId = $s->teacher_id;
-                    }
+                if ($pivotTeacherId && isset($teachersMap[$pivotTeacherId])) {
+                    $teacherName = $teachersMap[$pivotTeacherId]->name;
+                    $teacherId = $pivotTeacherId;
+                } elseif ($s->teacher) {
+                    $teacherName = $s->teacher->name;
+                    $teacherId = $s->teacher_id;
+                }
 
-                    return [
-                        'id' => $s->id,
-                        'name' => $s->name,
-                        'code' => $s->code,
-                        'department' => $s->department,
-                        'teacher' => $teacherName ?? 'Unassigned',
-                        'teacherId' => $teacherId,
-                    ];
-                }),
-                'subjectsCount' => $c->subjects->count(),
+                return [
+                    'id' => $s->id,
+                    'name' => $s->name,
+                    'code' => $s->code,
+                    'department' => $s->department,
+                    'teacher' => $teacherName ?? 'Unassigned',
+                    'teacherId' => $teacherId,
+                ];
+            }),
+            'subjectsCount' => $c->subjects->count(),
             ]);
 
         return response()->json(['data' => $classes]);
@@ -106,7 +108,7 @@ class ClassController extends Controller
             'teacher_id' => $data['teacherId'] ?? null,
         ]);
 
-        if (!empty($data['subjectIds'])) {
+        if (! empty($data['subjectIds'])) {
             $class->subjects()->sync($data['subjectIds']);
         }
 

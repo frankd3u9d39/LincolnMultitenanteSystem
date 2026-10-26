@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
@@ -34,7 +36,7 @@ class TeacherAssignmentController extends Controller
                 'required',
                 Rule::exists('school_classes', 'id')->where(function ($q) use ($schoolId, $teacherId) {
                     $q->where('school_id', $schoolId)
-                      ->orWhere('teacher_id', $teacherId);
+                        ->orWhere('teacher_id', $teacherId);
                 }),
             ],
             'due_date' => 'required|date',

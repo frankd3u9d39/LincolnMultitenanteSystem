@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
@@ -27,7 +29,7 @@ class TeacherAttendanceController extends Controller
         // 2. Classes where the teacher teaches a Subject
         $subjectClassIds = SchoolClass::whereHas('subjects', function ($q) use ($teacherId) {
             $q->where('courses.teacher_id', $teacherId)
-              ->orWhere('class_subject.teacher_id', $teacherId);
+                ->orWhere('class_subject.teacher_id', $teacherId);
         })->pluck('id');
 
         $classIds = $overseenClassIds->merge($subjectClassIds)->unique();
@@ -49,7 +51,7 @@ class TeacherAttendanceController extends Controller
             ->withCount('students')
             ->with(['teacher:id,name', 'subjects' => function ($q) {
                 $q->select('courses.id', 'courses.code', 'courses.name', 'courses.department', 'courses.teacher_id')
-                  ->with('teacher:id,name');
+                    ->with('teacher:id,name');
             }])
             ->get()
             ->map(function ($c) use ($teacherId, $todayAttendances) {
@@ -99,7 +101,7 @@ class TeacherAttendanceController extends Controller
         $teacherSubjects = Course::where('school_id', $schoolId)
             ->where(function ($q) use ($teacherId) {
                 $q->where('teacher_id', $teacherId)
-                  ->orWhereHas('classes', fn($cq) => $cq->where('class_subject.teacher_id', $teacherId));
+                    ->orWhereHas('classes', fn ($cq) => $cq->where('class_subject.teacher_id', $teacherId));
             })
             ->get(['id', 'code', 'name', 'department']);
 

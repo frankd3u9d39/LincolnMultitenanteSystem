@@ -3,9 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Course;
-use App\Models\FeeItem;
 use App\Models\School;
-use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,6 +21,7 @@ class AdminModuleTest extends TestCase
     use RefreshDatabase;
 
     private School $school;
+
     private User $admin;
 
     protected function setUp(): void

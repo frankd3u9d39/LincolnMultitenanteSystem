@@ -180,7 +180,9 @@ export function createAnnouncement(payload: { title: string; content: string; au
 
 export interface SchoolProfile {
   name: string;
+  motto?: string | null;
   code: string;
+  logoUrl?: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
   address: string | null;
@@ -198,7 +200,7 @@ export function getSchoolSettings(signal?: AbortSignal) {
   return api<{ data: SchoolProfile }>('/admin/school-settings', { signal }).then((r) => r.data);
 }
 
-export function updateSchoolSettings(payload: Partial<Omit<SchoolProfile, 'name' | 'code' | 'status' | 'maxStudents' | 'maxTeachers'>>) {
+export function updateSchoolSettings(payload: Partial<Omit<SchoolProfile, 'code' | 'status' | 'maxStudents' | 'maxTeachers'>>) {
   return api<{ data: SchoolProfile }>('/admin/school-settings', { method: 'PUT', body: payload }).then((r) => r.data);
 }
 
@@ -435,6 +437,8 @@ export interface ClassStudentResult {
   email: string;
   student_id_number: string;
   grade_level?: string;
+  ca1_score?: number | null;
+  ca2_score?: number | null;
   ca_score: number | null;
   exam_score: number | null;
   total_score: number | null;
@@ -456,22 +460,22 @@ export interface ClassResultsMeta {
 export interface ClassResultsResponse {
   class: { id: number; name: string; code: string; room?: string; form_master?: string };
   subjects: Array<{ id: number; code: string; name: string }>;
-  selected_course_id: number | null;
+  selected_course_id: number | string | null;
   term: string;
   meta?: ClassResultsMeta;
   students: ClassStudentResult[];
 }
 
-export function getClassResults(classId: number, courseId?: number, term?: string, signal?: AbortSignal) {
+export function getClassResults(classId: number, courseId?: number | string, term?: string, signal?: AbortSignal) {
   const query: Record<string, string | number> = {};
-  if (courseId) query.course_id = courseId;
+  if (courseId !== undefined && courseId !== null && courseId !== '') query.course_id = courseId;
   if (term) query.term = term;
   return api<ClassResultsResponse>(`/admin/classes/${classId}/results`, { signal, query });
 }
 
 export async function downloadClassResultsCsv(
   classId: number,
-  courseId?: number,
+  courseId?: number | string,
   term?: string,
   fileName?: string,
   format: 'pdf' | 'csv' = 'pdf'
@@ -509,11 +513,86 @@ export async function downloadClassResultsCsv(
   window.URL.revokeObjectURL(url);
 }
 
+export async function downloadStudentPerformanceReportPdf(
+  studentId: number | string,
+  studentName?: string,
+  term?: string
+) {
+  const token = typeof window !== 'undefined'
+    ? window.sessionStorage.getItem('lincoln.token') || window.localStorage.getItem('lincoln.token') || ''
+    : '';
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
+
+  const query = new URLSearchParams();
+  if (term) query.set('term', term);
+
+  const res = await fetch(`${baseUrl}/admin/students/${studentId}/performance-report/pdf?${query.toString()}`, {
+    headers: {
+      Accept: 'application/pdf',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to download student performance report PDF.');
+  }
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const safeName = (studentName || 'Pupil').replace(/[^a-zA-Z0-9_-]/g, '_');
+  a.download = `${safeName}_Performance_Report.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
+export async function downloadClassPerformanceReportsZip(
+  classId: number | string,
+  className?: string,
+  term?: string
+) {
+  const token = typeof window !== 'undefined'
+    ? window.sessionStorage.getItem('lincoln.token') || window.localStorage.getItem('lincoln.token') || ''
+    : '';
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
+
+  const query = new URLSearchParams();
+  if (term) query.set('term', term);
+
+  const res = await fetch(`${baseUrl}/admin/classes/${classId}/performance-reports/zip?${query.toString()}`, {
+    headers: {
+      Accept: 'application/zip',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to download class performance reports ZIP.');
+  }
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const safeName = (className || 'Class').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const safeTerm = (term || 'Term').replace(/[^a-zA-Z0-9_-]/g, '_');
+  a.download = `${safeName}_${safeTerm}_Pupils_Reports.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
 export function saveClassResults(classId: number, payload: {
   course_id: number;
   term: string;
   results: Array<{
     student_id: number;
+    ca1_score?: number | null;
+    ca2_score?: number | null;
     ca_score?: number | null;
     exam_score?: number | null;
     remark?: string | null;

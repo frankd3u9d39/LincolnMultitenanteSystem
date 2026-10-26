@@ -8,6 +8,8 @@ import {
   saveClassResults,
   uploadClassResultsCsv,
   downloadClassResultsCsv,
+  downloadStudentPerformanceReportPdf,
+  downloadClassPerformanceReportsZip,
   type SchoolClassDto,
   type AdminSubject,
   type ClassResultsMeta,
@@ -25,6 +27,8 @@ interface EditableStudentScore {
   email: string;
   student_id_number: string;
   grade_level?: string;
+  ca1_score: string;
+  ca2_score: string;
   ca_score: string;
   exam_score: string;
   total_score: number | null;
@@ -89,6 +93,7 @@ export function ClassResultsView() {
   const [meta, setMeta] = useState<ClassResultsMeta | null>(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingZip, setDownloadingZip] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -108,9 +113,8 @@ export function ClassResultsView() {
         if (classList && classList.length > 0) {
           setSelectedClassId(String(classList[0].id));
         }
-        if (subs.length > 0) {
-          setSelectedCourseId(String(subs[0].id));
-        }
+        // Default to "all" to automatically display composite multi-subject overview
+        setSelectedCourseId('all');
       })
       .catch((err) => {
         if (!ignore) {
@@ -140,6 +144,8 @@ export function ClassResultsView() {
         setMeta(data.meta || null);
 
         const mapped: EditableStudentScore[] = (data.students || []).map((s) => {
+          const ca1Str = s.ca1_score !== null && s.ca1_score !== undefined ? String(s.ca1_score) : '';
+          const ca2Str = s.ca2_score !== null && s.ca2_score !== undefined ? String(s.ca2_score) : '';
           const caStr = s.ca_score !== null && s.ca_score !== undefined ? String(s.ca_score) : '';
           const examStr = s.exam_score !== null && s.exam_score !== undefined ? String(s.exam_score) : '';
           const total = s.total_score !== null && s.total_score !== undefined ? s.total_score : null;
@@ -153,6 +159,8 @@ export function ClassResultsView() {
             email: s.email,
             student_id_number: s.student_id_number,
             grade_level: s.grade_level,
+            ca1_score: ca1Str,
+            ca2_score: ca2Str,
             ca_score: caStr,
             exam_score: examStr,
             total_score: total,
@@ -177,13 +185,21 @@ export function ClassResultsView() {
     };
   }, [selectedClassId, selectedCourseId, selectedTerm]);
 
-  const handleScoreChange = (index: number, field: 'ca_score' | 'exam_score' | 'remark', value: string) => {
+  const handleScoreChange = (index: number, field: 'ca1_score' | 'ca2_score' | 'ca_score' | 'exam_score' | 'remark', value: string) => {
     setScores((prev) => {
       const next = [...prev];
       const target = { ...next[index], [field]: value };
 
-      if (field === 'ca_score' || field === 'exam_score') {
-        const caNum = target.ca_score.trim() !== '' ? parseFloat(target.ca_score) : null;
+      if (field === 'ca1_score' || field === 'ca2_score' || field === 'ca_score' || field === 'exam_score') {
+        const ca1Num = target.ca1_score.trim() !== '' ? parseFloat(target.ca1_score) : null;
+        const ca2Num = target.ca2_score.trim() !== '' ? parseFloat(target.ca2_score) : null;
+        let caNum = target.ca_score.trim() !== '' ? parseFloat(target.ca_score) : null;
+
+        if (ca1Num !== null || ca2Num !== null) {
+          caNum = Math.round(((ca1Num ?? 0) + (ca2Num ?? 0)) * 100) / 100;
+          target.ca_score = String(caNum);
+        }
+
         const examNum = target.exam_score.trim() !== '' ? parseFloat(target.exam_score) : null;
 
         if (caNum !== null || examNum !== null) {
@@ -216,6 +232,8 @@ export function ClassResultsView() {
 
     const payloadResults = scores.map((s) => ({
       student_id: s.student_id,
+      ca1_score: s.ca1_score.trim() !== '' ? parseFloat(s.ca1_score) : null,
+      ca2_score: s.ca2_score.trim() !== '' ? parseFloat(s.ca2_score) : null,
       ca_score: s.ca_score.trim() !== '' ? parseFloat(s.ca_score) : null,
       exam_score: s.exam_score.trim() !== '' ? parseFloat(s.exam_score) : null,
       remark: s.remark.trim() || undefined,
@@ -327,6 +345,8 @@ export function ClassResultsView() {
         email: s.email,
         student_id_number: s.student_id_number,
         grade_level: s.grade_level,
+        ca1_score: s.ca1_score !== null && s.ca1_score !== undefined ? String(s.ca1_score) : '',
+        ca2_score: s.ca2_score !== null && s.ca2_score !== undefined ? String(s.ca2_score) : '',
         ca_score: s.ca_score !== null && s.ca_score !== undefined ? String(s.ca_score) : '',
         exam_score: s.exam_score !== null && s.exam_score !== undefined ? String(s.exam_score) : '',
         total_score: s.total_score,
@@ -388,6 +408,34 @@ export function ClassResultsView() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
               <span>{downloading ? 'Generating PDF...' : 'Download Broadsheet (PDF)'}</span>
+            </button>
+
+            {/* Whole Class Reports ZIP Package (Folder) */}
+            <button
+              type="button"
+              onClick={async () => {
+                if (!selectedClassId) return;
+                try {
+                  setDownloadingZip(true);
+                  await downloadClassPerformanceReportsZip(
+                    Number(selectedClassId),
+                    currentClassObj?.name,
+                    selectedTerm
+                  );
+                } catch {
+                  alert('Failed to download class report cards ZIP folder.');
+                } finally {
+                  setDownloadingZip(false);
+                }
+              }}
+              disabled={downloadingZip || scores.length === 0}
+              className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-md shadow-sky-900/10 flex items-center gap-1.5 transition-all disabled:opacity-50 active:scale-95 cursor-pointer"
+              title="Download complete report cards for all students in this class in a ZIP folder"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+              <span>{downloadingZip ? 'Packaging Folder (ZIP)...' : 'Download Class Reports (ZIP)'}</span>
             </button>
 
             {/* CSV Export Option */}
@@ -478,11 +526,11 @@ export function ClassResultsView() {
           <div>
             <label className="block text-xs font-bold text-zinc-700 mb-1">Subject</label>
             <select
-              value={selectedCourseId}
+              value={selectedCourseId || 'all'}
               onChange={(e) => setSelectedCourseId(e.target.value)}
               className="w-full text-xs rounded-xl border border-zinc-300 bg-zinc-50/50 p-2.5 font-medium text-zinc-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B81D22]/20 focus:border-[#B81D22]"
             >
-              {subjects.length === 0 && <option value="">No Subjects Configured</option>}
+              <option value="all">★ All Subjects (Composite Class Performance)</option>
               {subjects.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.code} — {s.name}
@@ -585,7 +633,7 @@ export function ClassResultsView() {
         <div className="p-4 border-b border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-zinc-900">
-              Score BroadSheet — {currentClassObj?.name || 'Class'} ({currentSubjectObj?.name || 'Subject'})
+              Score BroadSheet — {currentClassObj?.name || 'Class'} ({selectedCourseId === 'all' || !selectedCourseId ? 'All Subjects Composite' : (currentSubjectObj?.name || 'Subject')})
             </h3>
             <p className="text-[11px] text-zinc-500 mt-0.5">
               Reviewing results uploaded by Teacher ({meta?.subject_teacher || 'Assigned Instructor'}).
@@ -610,52 +658,83 @@ export function ClassResultsView() {
           <div className="p-12 text-center text-xs text-zinc-500">No students registered in this class.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[1100px]">
               <thead>
                 <tr className="bg-zinc-50/75 border-b border-zinc-200 text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                  <th className="py-3 px-4">#</th>
-                  <th className="py-3 px-4">Student Details</th>
-                  <th className="py-3 px-4">Student ID</th>
-                  <th className="py-3 px-4 text-center w-28">CA Score (40)</th>
-                  <th className="py-3 px-4 text-center w-28">Exam (70)</th>
-                  <th className="py-3 px-4 text-center w-28">Total (100)</th>
-                  <th className="py-3 px-4 text-center w-28">Letter Grade</th>
-                  <th className="py-3 px-4">Teacher Remark</th>
+                  <th className="py-3 px-3 w-10 text-center">#</th>
+                  <th className="py-3 px-4 min-w-[180px]">Student Details</th>
+                  <th className="py-3 px-3 font-mono">Student ID</th>
+                  <th className="py-3 px-3 text-center w-24 whitespace-nowrap">1st CA (20)</th>
+                  <th className="py-3 px-3 text-center w-24 whitespace-nowrap">2nd CA (20)</th>
+                  <th className="py-3 px-3 text-center w-24 whitespace-nowrap">Total CA (40)</th>
+                  <th className="py-3 px-3 text-center w-24 whitespace-nowrap">Exam (60)</th>
+                  <th className="py-3 px-3 text-center w-24 whitespace-nowrap">Total (100)</th>
+                  <th className="py-3 px-3 text-center w-28 whitespace-nowrap">Letter Grade</th>
+                  <th className="py-3 px-4 min-w-[160px]">Teacher Remark</th>
+                  <th className="py-3 px-3 text-center whitespace-nowrap">Pupil Report</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 text-xs text-zinc-800">
                 {scores.map((s, idx) => (
                   <tr key={s.student_id} className="hover:bg-zinc-50/50 transition-colors">
-                    <td className="py-3 px-4 text-zinc-400 font-mono text-[11px]">{idx + 1}</td>
+                    <td className="py-3 px-3 text-zinc-400 font-mono text-[11px] text-center">{idx + 1}</td>
                     <td className="py-3 px-4">
                       <p className="font-bold text-zinc-900">{s.name}</p>
                       <p className="text-[11px] text-zinc-400">{s.email}</p>
                     </td>
-                    <td className="py-3 px-4 font-mono font-semibold text-[11px] text-zinc-600">
+                    <td className="py-3 px-3 font-mono font-semibold text-[11px] text-zinc-600 whitespace-nowrap">
                       {s.student_id_number}
                     </td>
 
-                    {/* CA Score */}
-                    <td className="py-3 px-4 text-center">
+                    {/* 1st CA (20) */}
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
                       {editMode ? (
                         <input
                           type="number"
                           min="0"
-                          max="40"
+                          max="20"
                           step="0.5"
-                          value={s.ca_score}
-                          onChange={(e) => handleScoreChange(idx, 'ca_score', e.target.value)}
-                          className="w-20 px-2 py-1 text-xs rounded border border-zinc-300 text-center font-bold"
+                          value={s.ca1_score}
+                          onChange={(e) => handleScoreChange(idx, 'ca1_score', e.target.value)}
+                          className="w-16 px-1.5 py-1 text-xs rounded border border-zinc-300 text-center font-bold"
+                          placeholder="0-20"
                         />
                       ) : (
                         <span className="font-bold text-zinc-900">
-                          {s.ca_score !== '' ? s.ca_score : <span className="text-zinc-300 font-mono">—</span>}
+                          {s.ca1_score !== '' ? s.ca1_score : <span className="text-zinc-300 font-mono">—</span>}
                         </span>
                       )}
                     </td>
 
+                    {/* 2nd CA (20) */}
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      {editMode ? (
+                        <input
+                          type="number"
+                          min="0"
+                          max="20"
+                          step="0.5"
+                          value={s.ca2_score}
+                          onChange={(e) => handleScoreChange(idx, 'ca2_score', e.target.value)}
+                          className="w-16 px-1.5 py-1 text-xs rounded border border-zinc-300 text-center font-bold"
+                          placeholder="0-20"
+                        />
+                      ) : (
+                        <span className="font-bold text-zinc-900">
+                          {s.ca2_score !== '' ? s.ca2_score : <span className="text-zinc-300 font-mono">—</span>}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Total CA Score (40) */}
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      <span className="font-mono font-black text-xs text-zinc-900 bg-zinc-100 px-2 py-0.5 rounded">
+                        {s.ca_score !== '' ? `${s.ca_score}/40` : <span className="text-zinc-300 font-mono">—</span>}
+                      </span>
+                    </td>
+
                     {/* Exam Score */}
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
                       {editMode ? (
                         <input
                           type="number"
@@ -664,7 +743,8 @@ export function ClassResultsView() {
                           step="0.5"
                           value={s.exam_score}
                           onChange={(e) => handleScoreChange(idx, 'exam_score', e.target.value)}
-                          className="w-20 px-2 py-1 text-xs rounded border border-zinc-300 text-center font-bold"
+                          className="w-16 px-1.5 py-1 text-xs rounded border border-zinc-300 text-center font-bold"
+                          placeholder="0-60"
                         />
                       ) : (
                         <span className="font-bold text-zinc-900">
@@ -674,10 +754,10 @@ export function ClassResultsView() {
                     </td>
 
                     {/* Total Score */}
-                    <td className="py-3 px-4 text-center font-black text-sm">
+                    <td className="py-3 px-3 text-center font-black text-sm whitespace-nowrap">
                       {s.total_score !== null ? (
                         <span className={s.total_score >= 40 ? 'text-zinc-900' : 'text-red-600'}>
-                          {s.total_score}
+                          {s.total_score}%
                         </span>
                       ) : (
                         <span className="text-zinc-300 font-mono text-xs">—</span>
@@ -685,7 +765,7 @@ export function ClassResultsView() {
                     </td>
 
                     {/* Letter Grade */}
-                    <td className="py-3 px-4 text-center">{getGradeBadge(s.grade)}</td>
+                    <td className="py-3 px-3 text-center whitespace-nowrap">{getGradeBadge(s.grade)}</td>
 
                     {/* Remarks */}
                     <td className="py-3 px-4">
@@ -701,6 +781,21 @@ export function ClassResultsView() {
                           {s.remark || <span className="text-zinc-300 not-italic font-mono">—</span>}
                         </span>
                       )}
+                    </td>
+
+                    {/* Pupil Performance Report Download (Admin Exclusive) */}
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => downloadStudentPerformanceReportPdf(s.student_id, s.name, selectedTerm)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#0284C7] text-xs font-bold border border-sky-200 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                        title="Download official stamped Pupil's Performance Report PDF"
+                      >
+                        <svg className="w-3.5 h-3.5 text-[#0284C7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        <span>Pupil Report (PDF)</span>
+                      </button>
                     </td>
                   </tr>
                 ))}

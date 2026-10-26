@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
@@ -22,7 +24,7 @@ class TeacherDashboardController extends Controller
         // Subject classes
         $subjectClassIds = SchoolClass::whereHas('subjects', function ($q) use ($teacherId) {
             $q->where('courses.teacher_id', $teacherId)
-              ->orWhere('class_subject.teacher_id', $teacherId);
+                ->orWhere('class_subject.teacher_id', $teacherId);
         })->pluck('id');
 
         $classIds = $overseenClassIds->merge($subjectClassIds)->unique();

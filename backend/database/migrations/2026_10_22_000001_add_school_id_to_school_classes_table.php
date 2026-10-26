@@ -13,7 +13,7 @@ return new class extends Migration
     {
         if (Schema::hasTable('school_classes')) {
             Schema::table('school_classes', function (Blueprint $table) {
-                if (!Schema::hasColumn('school_classes', 'school_id')) {
+                if (! Schema::hasColumn('school_classes', 'school_id')) {
                     $table->foreignId('school_id')->nullable()->after('id')->constrained('schools')->cascadeOnDelete();
                 }
             });

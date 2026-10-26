@@ -18,12 +18,19 @@ class TeacherResultTest extends TestCase
     use RefreshDatabase;
 
     private School $school;
+
     private User $teacher;
+
     private User $otherTeacher;
+
     private User $admin;
+
     private SchoolClass $schoolClass;
+
     private Course $course;
+
     private User $studentUser;
+
     private Student $studentProfile;
 
     protected function setUp(): void
@@ -202,13 +209,19 @@ class TeacherResultTest extends TestCase
         $csvTemplateRes->assertOk();
         $this->assertStringContainsString('text/csv', $csvTemplateRes->headers->get('Content-Type'));
 
-        // 3. Download PDF Broadsheet Export
+        // 3. Download DOCX Template
+        $docxTemplateRes = $this->actingAs($this->teacher, 'sanctum')
+            ->get("/api/v1/teacher/classes/{$this->schoolClass->id}/results/csv-template?course_id={$this->course->id}&format=docx");
+        $docxTemplateRes->assertOk();
+        $this->assertStringContainsString('application/vnd.openxmlformats-officedocument.wordprocessingml.document', $docxTemplateRes->headers->get('Content-Type'));
+
+        // 4. Download PDF Broadsheet Export
         $pdfExportRes = $this->actingAs($this->teacher, 'sanctum')
             ->get("/api/v1/teacher/classes/{$this->schoolClass->id}/results/export?course_id={$this->course->id}&format=pdf");
         $pdfExportRes->assertOk();
         $this->assertStringContainsString('application/pdf', $pdfExportRes->headers->get('Content-Type'));
 
-        // 4. Download CSV Broadsheet Export
+        // 5. Download CSV Broadsheet Export
         $csvExportRes = $this->actingAs($this->teacher, 'sanctum')
             ->get("/api/v1/teacher/classes/{$this->schoolClass->id}/results/export?course_id={$this->course->id}&format=csv");
         $csvExportRes->assertOk();
@@ -367,4 +380,3 @@ class TeacherResultTest extends TestCase
         $this->assertStringContainsString('exam_score', $examCsvRes->streamedContent());
     }
 }
-

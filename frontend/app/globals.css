@@ -97,7 +97,7 @@ body.cbt-exam-active {
 
 body.cbt-exam-active aside,
 body.cbt-exam-active nav,
-body.cbt-exam-active header {
+body.cbt-exam-active header:not(#cbt-exam-hall-header) {
   display: none !important;
 }
 

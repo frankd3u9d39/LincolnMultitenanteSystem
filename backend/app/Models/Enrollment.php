@@ -1,12 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Enrollment extends Model
 {
+    use HasFactory;
     public const STATUS_IN_PROGRESS = 'in_progress';
 
     public const STATUS_COMPLETED = 'completed';
@@ -14,12 +18,14 @@ class Enrollment extends Model
     public const STATUS_WITHDRAWN = 'withdrawn';
 
     protected $fillable = [
-        'school_id', 'student_id', 'course_id', 'school_class_id', 'term', 'status', 'progress', 'grade', 'score', 'ca_score', 'exam_score', 'remark',
+        'school_id', 'student_id', 'course_id', 'school_class_id', 'term', 'status', 'progress', 'grade', 'score', 'ca1_score', 'ca2_score', 'ca_score', 'exam_score', 'remark',
     ];
 
     protected function casts(): array
     {
         return [
+            'ca1_score' => 'float',
+            'ca2_score' => 'float',
             'ca_score' => 'float',
             'exam_score' => 'float',
             'score' => 'float',

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -9,7 +11,6 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -54,7 +55,7 @@ class TeacherController extends Controller
             $currentCount = User::where('school_id', $school->id)->where('role', User::ROLE_TEACHER)->count();
             if ($currentCount >= $school->max_teachers) {
                 return response()->json([
-                    'message' => 'School teacher staff capacity has been reached (maximum ' . $school->max_teachers . ').',
+                    'message' => 'School teacher staff capacity has been reached (maximum '.$school->max_teachers.').',
                 ], 422);
             }
         }

@@ -27,6 +27,7 @@ class StudentModuleTest extends TestCase
     use RefreshDatabase;
 
     private School $school;
+
     private User $student;
 
     protected function setUp(): void

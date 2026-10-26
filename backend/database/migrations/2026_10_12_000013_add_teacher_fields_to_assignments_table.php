@@ -10,16 +10,16 @@ return new class extends Migration
     {
         if (Schema::hasTable('assignments')) {
             Schema::table('assignments', function (Blueprint $table) {
-                if (!Schema::hasColumn('assignments', 'school_class_id')) {
+                if (! Schema::hasColumn('assignments', 'school_class_id')) {
                     $table->foreignId('school_class_id')->nullable()->constrained('school_classes')->cascadeOnDelete();
                 }
-                if (!Schema::hasColumn('assignments', 'teacher_id')) {
+                if (! Schema::hasColumn('assignments', 'teacher_id')) {
                     $table->foreignId('teacher_id')->nullable()->constrained('users')->cascadeOnDelete();
                 }
-                if (!Schema::hasColumn('assignments', 'due_date')) {
+                if (! Schema::hasColumn('assignments', 'due_date')) {
                     $table->date('due_date')->nullable();
                 }
-                if (!Schema::hasColumn('assignments', 'total_marks')) {
+                if (! Schema::hasColumn('assignments', 'total_marks')) {
                     $table->integer('total_marks')->nullable()->default(100);
                 }
             });
@@ -56,7 +56,7 @@ return new class extends Migration
                 if (Schema::hasColumn('assignments', 'total_marks')) {
                     $columnsToDrop[] = 'total_marks';
                 }
-                if (!empty($columnsToDrop)) {
+                if (! empty($columnsToDrop)) {
                     $table->dropColumn($columnsToDrop);
                 }
             });

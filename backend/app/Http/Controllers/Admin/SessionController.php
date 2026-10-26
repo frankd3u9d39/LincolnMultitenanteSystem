@@ -1,10 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PlatformSetting;
-use App\Models\School;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ class SessionController extends Controller
     public function index(Request $request): JsonResponse
     {
         $school = $request->user()->school;
-        $currentYear = $school->academic_year_current ?? date('Y') . '/' . (date('Y') + 1);
+        $currentYear = $school->academic_year_current ?? date('Y').'/'.(date('Y') + 1);
 
         $studentCount = User::where('school_id', $school->id)->where('role', User::ROLE_STUDENT)->count();
 
@@ -130,6 +131,7 @@ class SessionController extends Controller
         }
 
         $decoded = json_decode($setting->value, true);
+
         return is_array($decoded) ? $decoded : [];
     }
 

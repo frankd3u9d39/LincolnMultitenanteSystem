@@ -7,7 +7,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class SchoolBrandingTest extends TestCase
@@ -15,7 +14,9 @@ class SchoolBrandingTest extends TestCase
     use RefreshDatabase;
 
     private School $school;
+
     private User $admin;
+
     private User $superAdmin;
 
     protected function setUp(): void

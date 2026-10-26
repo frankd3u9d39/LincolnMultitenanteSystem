@@ -1,17 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
+use App\Models\Assignment;
+use App\Models\AssignmentSubmission;
 use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\Docx\ResultDocxService;
+use App\Services\Pdf\ResultPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * GROUP 2: Teacher Module - Class Assessment & Results Portal.
@@ -35,7 +41,7 @@ class TeacherResultController extends Controller
             ->where('teacher_id', $teacherId)
             ->with(['subjects' => function ($q) {
                 $q->select('courses.id', 'courses.code', 'courses.name', 'courses.department', 'courses.teacher_id')
-                  ->with('teacher:id,name');
+                    ->with('teacher:id,name');
             }])
             ->withCount('students')
             ->get();
@@ -44,11 +50,11 @@ class TeacherResultController extends Controller
         $subjectClasses = SchoolClass::where('school_id', $schoolId)
             ->whereHas('subjects', function ($q) use ($teacherId) {
                 $q->where('courses.teacher_id', $teacherId)
-                  ->orWhere('class_subject.teacher_id', $teacherId);
+                    ->orWhere('class_subject.teacher_id', $teacherId);
             })
             ->with(['subjects' => function ($q) {
                 $q->select('courses.id', 'courses.code', 'courses.name', 'courses.department', 'courses.teacher_id')
-                  ->with('teacher:id,name');
+                    ->with('teacher:id,name');
             }])
             ->withCount('students')
             ->get();
@@ -60,7 +66,7 @@ class TeacherResultController extends Controller
             $mergedClasses = SchoolClass::where('school_id', $schoolId)
                 ->with(['subjects' => function ($q) {
                     $q->select('courses.id', 'courses.code', 'courses.name', 'courses.department', 'courses.teacher_id')
-                      ->with('teacher:id,name');
+                        ->with('teacher:id,name');
                 }])
                 ->withCount('students')
                 ->get();
@@ -154,7 +160,7 @@ class TeacherResultController extends Controller
                         'student_profile_id' => $u->studentProfile?->id,
                         'name' => $u->name,
                         'email' => $u->email,
-                        'student_id_number' => $u->studentProfile?->student_id_number ?? ('LC-STD-' . str_pad($u->id, 4, '0', STR_PAD_LEFT)),
+                        'student_id_number' => $u->studentProfile?->student_id_number ?? ('LC-STD-'.str_pad((string) $u->id, 4, '0', STR_PAD_LEFT)),
                         'grade_level' => $u->studentProfile?->grade_level ?? 'Secondary',
                     ];
                 });
@@ -172,13 +178,13 @@ class TeacherResultController extends Controller
                 ->get()
                 ->keyBy('student_id');
 
-            $cbtAssignmentIds = \App\Models\Assignment::where('school_id', $school->id)
+            $cbtAssignmentIds = Assignment::where('school_id', $school->id)
                 ->where('course_id', $courseId)
                 ->where('type', 'Exam')
                 ->pluck('id');
 
             if ($cbtAssignmentIds->isNotEmpty()) {
-                $cbtSubmissions = \App\Models\AssignmentSubmission::whereIn('assignment_id', $cbtAssignmentIds)
+                $cbtSubmissions = AssignmentSubmission::whereIn('assignment_id', $cbtAssignmentIds)
                     ->whereIn('student_id', $studentIds)
                     ->get()
                     ->keyBy('student_id');
@@ -207,6 +213,8 @@ class TeacherResultController extends Controller
                 'email' => $s['email'],
                 'student_id_number' => $s['student_id_number'],
                 'grade_level' => $s['grade_level'],
+                'ca1_score' => $enrollment?->ca1_score !== null ? (float) $enrollment->ca1_score : null,
+                'ca2_score' => $enrollment?->ca2_score !== null ? (float) $enrollment->ca2_score : null,
                 'ca_score' => $enrollment?->ca_score !== null ? (float) $enrollment->ca_score : null,
                 'exam_score' => $enrollment?->exam_score !== null ? (float) $enrollment->exam_score : null,
                 'total_score' => $enrollment?->score !== null ? (float) $enrollment->score : null,
@@ -236,7 +244,7 @@ class TeacherResultController extends Controller
     }
 
     /**
-     * Stores/updates Test (CA) and Examination scores submitted by the teacher.
+     * Stores/updates Test (1CA, 2CA, Total CA) and Examination scores submitted by the teacher.
      */
     public function store(Request $request, SchoolClass $schoolClass): JsonResponse
     {
@@ -250,6 +258,8 @@ class TeacherResultController extends Controller
             'term' => ['required', 'string', 'max:50'],
             'results' => ['required', 'array'],
             'results.*.student_id' => ['required', 'integer', 'exists:users,id'],
+            'results.*.ca1_score' => ['nullable', 'numeric', 'min:0', 'max:20'],
+            'results.*.ca2_score' => ['nullable', 'numeric', 'min:0', 'max:20'],
             'results.*.ca_score' => ['nullable', 'numeric', 'min:0', 'max:40'],
             'results.*.exam_score' => ['nullable', 'numeric', 'min:0', 'max:70'],
             'results.*.remark' => ['nullable', 'string', 'max:60'],
@@ -260,19 +270,31 @@ class TeacherResultController extends Controller
 
         DB::transaction(function () use ($school, $schoolClass, $course, $validated, &$savedCount) {
             foreach ($validated['results'] as $item) {
+                $hasCa1 = isset($item['ca1_score']) && $item['ca1_score'] !== '' && $item['ca1_score'] !== null;
+                $hasCa2 = isset($item['ca2_score']) && $item['ca2_score'] !== '' && $item['ca2_score'] !== null;
                 $hasCa = isset($item['ca_score']) && $item['ca_score'] !== '' && $item['ca_score'] !== null;
                 $hasExam = isset($item['exam_score']) && $item['exam_score'] !== '' && $item['exam_score'] !== null;
 
-                if (! $hasCa && ! $hasExam) {
+                if (! $hasCa1 && ! $hasCa2 && ! $hasCa && ! $hasExam) {
                     continue;
                 }
 
-                $ca = $hasCa ? round((float) $item['ca_score'], 2) : 0.0;
+                $ca1 = $hasCa1 ? round((float) $item['ca1_score'], 2) : null;
+                $ca2 = $hasCa2 ? round((float) $item['ca2_score'], 2) : null;
+
+                if ($hasCa1 || $hasCa2) {
+                    $ca = round(($ca1 ?? 0.0) + ($ca2 ?? 0.0), 2);
+                } elseif ($hasCa) {
+                    $ca = round((float) $item['ca_score'], 2);
+                } else {
+                    $ca = 0.0;
+                }
+
                 $exam = $hasExam ? round((float) $item['exam_score'], 2) : 0.0;
                 $total = round($ca + $exam, 2);
 
                 $grade = $this->calculateGrade($total);
-                $remark = !empty($item['remark']) ? $item['remark'] : $this->defaultRemark($grade);
+                $remark = ! empty($item['remark']) ? $item['remark'] : $this->defaultRemark($grade);
 
                 Enrollment::updateOrCreate(
                     [
@@ -283,6 +305,8 @@ class TeacherResultController extends Controller
                     ],
                     [
                         'school_class_id' => $schoolClass->id,
+                        'ca1_score' => $ca1,
+                        'ca2_score' => $ca2,
                         'ca_score' => $ca,
                         'exam_score' => $exam,
                         'score' => $total,
@@ -306,7 +330,7 @@ class TeacherResultController extends Controller
 
     /**
      * Uploads class results via CSV or Excel (.xlsx) file by the teacher.
-     * Supports Continuous Assessment (Test/CA), Terminal Examination, or Combined score sheets.
+     * Supports Continuous Assessment (1CA, 2CA, Combined CA), Terminal Examination, or Combined score sheets.
      */
     public function uploadCsv(Request $request, SchoolClass $schoolClass): JsonResponse
     {
@@ -319,11 +343,12 @@ class TeacherResultController extends Controller
             'course_id' => ['required', 'integer', 'exists:courses,id'],
             'term' => ['required', 'string', 'max:50'],
             'file' => ['required', 'file', 'max:5120'],
-            'upload_type' => ['nullable', 'string', 'in:combined,ca,exam,auto'],
+            'upload_type' => ['nullable', 'string', 'in:combined,ca,1ca,2ca,ca1,ca2,exam,auto'],
         ]);
 
         $course = Course::where('school_id', $school->id)->findOrFail($request->integer('course_id'));
         $term = $request->string('term')->toString();
+        $uploadType = strtolower($request->string('upload_type', 'auto')->toString());
         $uploadFile = $request->file('file');
 
         $ext = strtolower($uploadFile->getClientOriginalExtension());
@@ -343,18 +368,29 @@ class TeacherResultController extends Controller
 
         $normalizedHeader = array_map(function ($h) {
             $cleaned = strtolower(trim((string) $h));
+
             return preg_replace('/[^a-z0-9_]/', '', str_replace([' ', '-', '.'], '_', $cleaned));
         }, $header);
 
         $idAliases = ['student_id_number', 'id_number', 'student_id', 'reg_no', 'matric_no', 'admission_no', 'student_number', 'id', 'user_id'];
         $emailAliases = ['email', 'student_email', 'mail'];
-        $caAliases = ['ca_score', 'ca', 'test', 'test_score', 'continuous_assessment', 'ca_mark', 'test_mark', 'midterm', 'mid_term', 'assessment', 'test_1', 'ca_1', 'test_score_ca_40'];
+        $ca1Aliases = ['1ca_score', '1ca', 'ca1_score', 'ca1', 'ca_1', '1_ca', 'first_ca', '1st_ca', 'test_1', 'test1', 'first_test', '1st_test', '1st_ca_score', 'test_1_score'];
+        $ca2Aliases = ['2ca_score', '2ca', 'ca2_score', 'ca2', 'ca_2', '2_ca', 'second_ca', '2nd_ca', 'test_2', 'test2', 'second_test', '2nd_test', 'midterm', 'mid_term', '2nd_ca_score', 'test_2_score'];
+        $caAliases = ['ca_score', 'ca', 'test', 'test_score', 'continuous_assessment', 'ca_mark', 'test_mark', 'assessment', 'test_score_ca_40', 'total_ca'];
         $examAliases = ['exam_score', 'exam', 'exams', 'examination', 'final_exam', 'finals', 'exam_mark', 'terminal_exam', 'exam_score_70'];
         $remarkAliases = ['remark', 'remarks', 'comment', 'comments', 'teacher_remark', 'teacher_comment'];
 
         $idIdx = $this->findHeaderIndex($normalizedHeader, $idAliases);
         $emailIdx = $this->findHeaderIndex($normalizedHeader, $emailAliases);
+        $ca1Idx = $this->findHeaderIndex($normalizedHeader, $ca1Aliases);
+        $ca2Idx = $this->findHeaderIndex($normalizedHeader, $ca2Aliases);
         $caIdx = $this->findHeaderIndex($normalizedHeader, $caAliases);
+
+        // Ensure caIdx doesn't conflict with ca1Idx or ca2Idx
+        if ($caIdx !== false && ($caIdx === $ca1Idx || $caIdx === $ca2Idx)) {
+            $caIdx = false;
+        }
+
         $examIdx = $this->findHeaderIndex($normalizedHeader, $examAliases);
         $remarkIdx = $this->findHeaderIndex($normalizedHeader, $remarkAliases);
 
@@ -364,9 +400,9 @@ class TeacherResultController extends Controller
             ], 422);
         }
 
-        if ($caIdx === false && $examIdx === false) {
+        if ($ca1Idx === false && $ca2Idx === false && $caIdx === false && $examIdx === false) {
             return response()->json([
-                'message' => 'Could not detect score columns. File must contain at least "ca_score" (or "test") or "exam_score" (or "exam").',
+                'message' => 'Could not detect score columns. File must contain at least "1ca" (or "ca1"), "2ca" (or "ca2"), "ca_score", or "exam_score".',
             ], 422);
         }
 
@@ -382,12 +418,15 @@ class TeacherResultController extends Controller
 
             $idNumber = ($idIdx !== false && isset($row[$idIdx])) ? trim((string) $row[$idIdx]) : null;
             $email = ($emailIdx !== false && isset($row[$emailIdx])) ? trim((string) $row[$emailIdx]) : null;
+            $ca1Raw = ($ca1Idx !== false && isset($row[$ca1Idx])) ? trim((string) $row[$ca1Idx]) : null;
+            $ca2Raw = ($ca2Idx !== false && isset($row[$ca2Idx])) ? trim((string) $row[$ca2Idx]) : null;
             $caRaw = ($caIdx !== false && isset($row[$caIdx])) ? trim((string) $row[$caIdx]) : null;
             $examRaw = ($examIdx !== false && isset($row[$examIdx])) ? trim((string) $row[$examIdx]) : null;
             $remark = ($remarkIdx !== false && isset($row[$remarkIdx])) ? trim((string) $row[$remarkIdx]) : null;
 
             if (! $idNumber && ! $email) {
                 $errors[] = "Row {$rowNum}: Missing student ID number or email.";
+
                 continue;
             }
 
@@ -404,32 +443,71 @@ class TeacherResultController extends Controller
 
             if (! $user) {
                 $errors[] = "Row {$rowNum}: No student found for ID '{$idNumber}' or Email '{$email}'.";
+
                 continue;
             }
 
+            $hasCa1 = ($ca1Raw !== null && $ca1Raw !== '' && is_numeric($ca1Raw));
+            $hasCa2 = ($ca2Raw !== null && $ca2Raw !== '' && is_numeric($ca2Raw));
             $hasCa = ($caRaw !== null && $caRaw !== '' && is_numeric($caRaw));
             $hasExam = ($examRaw !== null && $examRaw !== '' && is_numeric($examRaw));
 
-            if (! $hasCa && ! $hasExam) {
+            // If upload_type is specifically '1ca' or 'ca1', map a single CA column to 1CA
+            if (($uploadType === '1ca' || $uploadType === 'ca1') && ! $hasCa1 && $hasCa) {
+                $ca1Raw = $caRaw;
+                $hasCa1 = true;
+                $hasCa = false;
+            }
+            // If upload_type is specifically '2ca' or 'ca2', map a single CA column to 2CA
+            if (($uploadType === '2ca' || $uploadType === 'ca2') && ! $hasCa2 && $hasCa) {
+                $ca2Raw = $caRaw;
+                $hasCa2 = true;
+                $hasCa = false;
+            }
+
+            if (! $hasCa1 && ! $hasCa2 && ! $hasCa && ! $hasExam) {
                 continue;
             }
 
-            // Retrieve existing enrollment to preserve untouched component (e.g. keeping CA when uploading Exam)
+            // Retrieve existing enrollment to preserve untouched components
             $existing = Enrollment::where('school_id', $school->id)
                 ->where('student_id', $user->id)
                 ->where('course_id', $course->id)
                 ->where('term', $term)
                 ->first();
 
-            $caVal = $hasCa ? round((float) $caRaw, 2) : ($existing?->ca_score !== null ? (float) $existing->ca_score : null);
+            $ca1Val = $hasCa1 ? round((float) $ca1Raw, 2) : ($existing?->ca1_score !== null ? (float) $existing->ca1_score : null);
+            $ca2Val = $hasCa2 ? round((float) $ca2Raw, 2) : ($existing?->ca2_score !== null ? (float) $existing->ca2_score : null);
+
+            // Calculate total CA
+            if ($ca1Val !== null || $ca2Val !== null) {
+                $caVal = round(($ca1Val ?? 0.0) + ($ca2Val ?? 0.0), 2);
+            } elseif ($hasCa) {
+                $caVal = round((float) $caRaw, 2);
+            } else {
+                $caVal = ($existing?->ca_score !== null ? (float) $existing->ca_score : null);
+            }
+
             $examVal = $hasExam ? round((float) $examRaw, 2) : ($existing?->exam_score !== null ? (float) $existing->exam_score : null);
 
+            if ($ca1Val !== null && ($ca1Val < 0 || $ca1Val > 20)) {
+                $errors[] = "Row {$rowNum} ({$user->name}): 1st CA Score must be between 0 and 20 (got {$ca1Val}).";
+
+                continue;
+            }
+            if ($ca2Val !== null && ($ca2Val < 0 || $ca2Val > 20)) {
+                $errors[] = "Row {$rowNum} ({$user->name}): 2nd CA Score must be between 0 and 20 (got {$ca2Val}).";
+
+                continue;
+            }
             if ($caVal !== null && ($caVal < 0 || $caVal > 40)) {
-                $errors[] = "Row {$rowNum} ({$user->name}): CA Score must be between 0 and 40 (got {$caVal}).";
+                $errors[] = "Row {$rowNum} ({$user->name}): Total CA Score must be between 0 and 40 (got {$caVal}).";
+
                 continue;
             }
             if ($examVal !== null && ($examVal < 0 || $examVal > 70)) {
                 $errors[] = "Row {$rowNum} ({$user->name}): Exam Score must be between 0 and 70 (got {$examVal}).";
+
                 continue;
             }
 
@@ -444,7 +522,7 @@ class TeacherResultController extends Controller
 
             $computedRemark = ! empty($remark)
                 ? $remark
-                : ($bothPresent ? $this->defaultRemark($grade) : ($hasCa ? 'Continuous Assessment Recorded' : 'Exam Recorded'));
+                : ($bothPresent ? $this->defaultRemark($grade) : ($hasCa1 || $hasCa2 || $hasCa ? 'Continuous Assessment Recorded' : 'Exam Recorded'));
 
             Enrollment::updateOrCreate(
                 [
@@ -455,6 +533,8 @@ class TeacherResultController extends Controller
                 ],
                 [
                     'school_class_id' => $schoolClass->id,
+                    'ca1_score' => $ca1Val,
+                    'ca2_score' => $ca2Val,
                     'ca_score' => $caVal,
                     'exam_score' => $examVal,
                     'score' => $total,
@@ -468,7 +548,14 @@ class TeacherResultController extends Controller
             $savedCount++;
         }
 
-        $typeLabel = ($caIdx !== false && $examIdx !== false) ? 'Continuous Assessment (Test) & Examination' : ($caIdx !== false ? 'Continuous Assessment (Test)' : 'Examination');
+        $typeLabel = match (true) {
+            $hasCa1 && $hasCa2 && $hasExam => 'Continuous Assessment (1CA & 2CA) & Examination',
+            $hasCa1 && ! $hasCa2 && ! $hasExam => '1st Continuous Assessment (1CA)',
+            $hasCa2 && ! $hasCa1 && ! $hasExam => '2nd Continuous Assessment (2CA)',
+            $hasCa && $hasExam => 'Continuous Assessment (Test) & Examination',
+            $hasCa => 'Continuous Assessment (Test)',
+            default => 'Examination',
+        };
 
         return response()->json([
             'status' => 'success',
@@ -480,9 +567,9 @@ class TeacherResultController extends Controller
 
     /**
      * Downloads pre-filled roster template for offline marking.
-     * Supports PDF format (default) and CSV format, for 'combined', 'ca', or 'exam'.
+     * Supports PDF format (default) and CSV format, for 'combined', '1ca', '2ca', 'ca', or 'exam'.
      */
-    public function csvTemplate(Request $request, SchoolClass $schoolClass): \Symfony\Component\HttpFoundation\Response
+    public function csvTemplate(Request $request, SchoolClass $schoolClass): Response
     {
         $teacher = $request->user();
         $this->authorizeTeacherForClass($teacher, $schoolClass);
@@ -491,7 +578,7 @@ class TeacherResultController extends Controller
         $courseId = $request->query('course_id');
         $course = $courseId ? Course::where('school_id', $school->id)->find($courseId) : null;
         $term = $request->query('term', $school->academic_year_current ?? 'First Term 2025/2026');
-        $type = $request->query('type', 'combined'); // 'combined', 'ca', 'exam'
+        $type = strtolower($request->query('type', 'combined')); // 'combined', '1ca', '2ca', 'ca', 'exam'
         $format = strtolower($request->query('format', 'pdf')); // 'pdf' or 'csv'
 
         $students = $schoolClass->students()->with('user')->get()->map(function (Student $sp) {
@@ -512,7 +599,7 @@ class TeacherResultController extends Controller
                 ->map(function (User $u) {
                     return [
                         'student_id' => $u->id,
-                        'student_id_number' => $u->studentProfile?->student_id_number ?? ('LC-STD-' . str_pad($u->id, 4, '0', STR_PAD_LEFT)),
+                        'student_id_number' => $u->studentProfile?->student_id_number ?? ('LC-STD-'.str_pad((string) $u->id, 4, '0', STR_PAD_LEFT)),
                         'name' => $u->name,
                         'email' => $u->email,
                     ];
@@ -520,6 +607,8 @@ class TeacherResultController extends Controller
         }
 
         $typePrefix = match ($type) {
+            '1ca', 'ca1' => '1CA_Test',
+            '2ca', 'ca2' => '2CA_Test',
             'ca' => 'CA_Test',
             'exam' => 'Exam',
             default => 'Results',
@@ -527,7 +616,7 @@ class TeacherResultController extends Controller
 
         // PDF Generation
         if ($format === 'pdf') {
-            $pdfService = new \App\Services\Pdf\ResultPdfService();
+            $pdfService = new ResultPdfService;
             $pdfData = $pdfService->generateTemplatePdf(
                 $schoolClass,
                 $course,
@@ -553,6 +642,34 @@ class TeacherResultController extends Controller
             ]);
         }
 
+        // Word DOCX Generation
+        if ($format === 'docx') {
+            $docxService = new ResultDocxService;
+            $docxData = $docxService->generateTemplateDocx(
+                $schoolClass,
+                $course,
+                $term,
+                $type,
+                $students,
+                $teacher->name
+            );
+
+            $docxFileName = sprintf(
+                '%s_%s_%s_%s_Template.docx',
+                preg_replace('/[^a-zA-Z0-9_-]/', '_', $schoolClass->name),
+                $course ? preg_replace('/[^a-zA-Z0-9_-]/', '_', $course->code) : 'Subject',
+                $typePrefix,
+                preg_replace('/[^a-zA-Z0-9_-]/', '_', $term)
+            );
+
+            return response($docxData, 200, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'Content-Disposition' => "attachment; filename=\"{$docxFileName}\"",
+                'Pragma' => 'no-cache',
+                'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            ]);
+        }
+
         $fileName = sprintf(
             '%s_%s_%s_%s_Template.csv',
             preg_replace('/[^a-zA-Z0-9_-]/', '_', $schoolClass->name),
@@ -572,10 +689,20 @@ class TeacherResultController extends Controller
         return response()->stream(function () use ($students, $type) {
             $handle = fopen('php://output', 'w');
 
-            if ($type === 'ca') {
-                fputcsv($handle, ['student_id_number', 'student_name', 'email', 'ca_score', 'remark']);
+            if ($type === '1ca' || $type === 'ca1') {
+                fputcsv($handle, ['student_id_number', 'student_name', 'email', '1ca_score', 'remark']);
                 foreach ($students as $student) {
                     fputcsv($handle, [$student['student_id_number'], $student['name'], $student['email'], '', '']);
+                }
+            } elseif ($type === '2ca' || $type === 'ca2') {
+                fputcsv($handle, ['student_id_number', 'student_name', 'email', '2ca_score', 'remark']);
+                foreach ($students as $student) {
+                    fputcsv($handle, [$student['student_id_number'], $student['name'], $student['email'], '', '']);
+                }
+            } elseif ($type === 'ca') {
+                fputcsv($handle, ['student_id_number', 'student_name', 'email', '1ca_score', '2ca_score', 'ca_score', 'remark']);
+                foreach ($students as $student) {
+                    fputcsv($handle, [$student['student_id_number'], $student['name'], $student['email'], '', '', '', '']);
                 }
             } elseif ($type === 'exam') {
                 fputcsv($handle, ['student_id_number', 'student_name', 'email', 'exam_score', 'remark']);
@@ -583,9 +710,9 @@ class TeacherResultController extends Controller
                     fputcsv($handle, [$student['student_id_number'], $student['name'], $student['email'], '', '']);
                 }
             } else {
-                fputcsv($handle, ['student_id_number', 'student_name', 'email', 'ca_score', 'exam_score', 'remark']);
+                fputcsv($handle, ['student_id_number', 'student_name', 'email', '1ca_score', '2ca_score', 'ca_score', 'exam_score', 'remark']);
                 foreach ($students as $student) {
-                    fputcsv($handle, [$student['student_id_number'], $student['name'], $student['email'], '', '', '']);
+                    fputcsv($handle, [$student['student_id_number'], $student['name'], $student['email'], '', '', '', '', '']);
                 }
             }
 
@@ -663,7 +790,7 @@ class TeacherResultController extends Controller
             return [];
         }
 
-        $zip = new \ZipArchive();
+        $zip = new \ZipArchive;
         if ($zip->open($path) !== true) {
             return [];
         }
@@ -758,7 +885,7 @@ class TeacherResultController extends Controller
     /**
      * Downloads/exports the current results as a PDF broadsheet or CSV broadsheet.
      */
-    public function export(Request $request, SchoolClass $schoolClass): \Symfony\Component\HttpFoundation\Response
+    public function export(Request $request, SchoolClass $schoolClass): Response
     {
         $teacher = $request->user();
         $this->authorizeTeacherForClass($teacher, $schoolClass);
@@ -777,10 +904,11 @@ class TeacherResultController extends Controller
                 ->take(30)
                 ->get()
                 ->map(function (User $u) {
-                    $obj = new \stdClass();
+                    $obj = new \stdClass;
                     $obj->user_id = $u->id;
-                    $obj->student_id_number = $u->studentProfile?->student_id_number ?? ('LC-STD-' . str_pad($u->id, 4, '0', STR_PAD_LEFT));
+                    $obj->student_id_number = $u->studentProfile?->student_id_number ?? ('LC-STD-'.str_pad((string) $u->id, 4, '0', STR_PAD_LEFT));
                     $obj->user = $u;
+
                     return $obj;
                 });
         }
@@ -798,7 +926,7 @@ class TeacherResultController extends Controller
         }
 
         if ($format === 'pdf') {
-            $pdfService = new \App\Services\Pdf\ResultPdfService();
+            $pdfService = new ResultPdfService;
             $pdfData = $pdfService->generateBroadsheetPdf(
                 $schoolClass,
                 $course,
@@ -871,7 +999,7 @@ class TeacherResultController extends Controller
         $teachesSubject = $schoolClass->subjects()
             ->where(function ($q) use ($teacher) {
                 $q->where('courses.teacher_id', $teacher->id)
-                  ->orWhere('class_subject.teacher_id', $teacher->id);
+                    ->orWhere('class_subject.teacher_id', $teacher->id);
             })->exists();
 
         if ($teachesSubject) {
@@ -913,7 +1041,7 @@ class TeacherResultController extends Controller
     /**
      * Downloads a candidate's CBT Examination Answer Script PDF for teacher manual marking.
      */
-    public function downloadCbtScript(Request $request, \App\Models\AssignmentSubmission $submission): \Symfony\Component\HttpFoundation\Response
+    public function downloadCbtScript(Request $request, AssignmentSubmission $submission): Response
     {
         $teacher = $request->user();
         if ($submission->assignment?->school_id !== $teacher->school_id) {
@@ -925,6 +1053,7 @@ class TeacherResultController extends Controller
         }
 
         $filePath = public_path($submission->file_path);
+
         return response()->download($filePath, basename($filePath), [
             'Content-Type' => 'application/pdf',
         ]);

@@ -1,11 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Assignment;
 use App\Models\Course;
-use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,7 +51,7 @@ class ExaminationController extends Controller
             // 1. If explicit status is saved in metadata, respect it.
             // 2. Otherwise: if exam date is strictly before today (yesterday or older), it is 'Completed'.
             // 3. If exam date is today or in the future, it is 'Scheduled' (not yet completed).
-            if (!empty($meta['status']) && in_array($meta['status'], ['Scheduled', 'In Progress', 'Completed', 'Cancelled'])) {
+            if (! empty($meta['status']) && in_array($meta['status'], ['Scheduled', 'In Progress', 'Completed', 'Cancelled'])) {
                 $status = $meta['status'];
             } else {
                 if ($examDate->lt($today)) {
@@ -69,7 +70,7 @@ class ExaminationController extends Controller
 
             return [
                 'id' => $a->id,
-                'examCode' => 'EX-' . ($a->course?->code ?? 'GEN') . '-' . $a->id,
+                'examCode' => 'EX-'.($a->course?->code ?? 'GEN').'-'.$a->id,
                 'courseCode' => $a->course?->code ?? 'N/A',
                 'courseName' => $a->course?->name ?? $a->title,
                 'title' => $a->title,
@@ -124,7 +125,7 @@ class ExaminationController extends Controller
 
         $cbtCode = null;
         if ($isCbt) {
-            $cbtCode = !empty($data['cbtAccessCode']) ? strtoupper(trim($data['cbtAccessCode'])) : ('CBT-' . rand(10000, 99999));
+            $cbtCode = ! empty($data['cbtAccessCode']) ? strtoupper(trim($data['cbtAccessCode'])) : ('CBT-'.rand(10000, 99999));
         }
 
         $course = Course::where('school_id', $school->id)->where('code', $data['courseCode'])->first();
@@ -154,7 +155,7 @@ class ExaminationController extends Controller
         // Extract start time if present, e.g. "08:30" from "08:30 - 10:30 (Morning Session 1)"
         preg_match('/(\d{1,2}:\d{2})/', $data['time'], $timeMatches);
         $startTime = $timeMatches[1] ?? '08:30';
-        $dueAt = Carbon::parse($data['date'] . ' ' . $startTime);
+        $dueAt = Carbon::parse($data['date'].' '.$startTime);
 
         $assignment = Assignment::create([
             'school_id' => $school->id,
@@ -170,7 +171,7 @@ class ExaminationController extends Controller
             'message' => 'Examination scheduled successfully.',
             'data' => [
                 'id' => $assignment->id,
-                'examCode' => 'EX-' . $course->code . '-' . $assignment->id,
+                'examCode' => 'EX-'.$course->code.'-'.$assignment->id,
                 'courseCode' => $course->code,
                 'courseName' => $course->name,
                 'title' => $assignment->title,

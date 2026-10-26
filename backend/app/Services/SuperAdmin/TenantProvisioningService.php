@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\SuperAdmin;
 
 use App\Models\AuditLog;
 use App\Models\School;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -31,14 +34,14 @@ class TenantProvisioningService
 
         return DB::transaction(function () use ($data, $activateImmediately) {
             $logoUrl = $data['logo_url'] ?? null;
-            if (isset($data['logo']) && $data['logo'] instanceof \Illuminate\Http\UploadedFile) {
-                $filename = 'logo_' . \Illuminate\Support\Str::slug($data['code']) . '_' . time() . '.' . $data['logo']->getClientOriginalExtension();
+            if (isset($data['logo']) && $data['logo'] instanceof UploadedFile) {
+                $filename = 'logo_'.Str::slug($data['code']).'_'.time().'.'.$data['logo']->getClientOriginalExtension();
                 $targetDir = public_path('uploads/logos');
                 if (! file_exists($targetDir)) {
                     mkdir($targetDir, 0777, true);
                 }
                 $data['logo']->move($targetDir, $filename);
-                $logoUrl = '/uploads/logos/' . $filename;
+                $logoUrl = '/uploads/logos/'.$filename;
             }
 
             $school = School::create([
@@ -65,7 +68,7 @@ class TenantProvisioningService
                 'onboarded_at' => now(),
             ]);
 
-            $password = !empty($data['password']) ? $data['password'] : Str::password(16);
+            $password = ! empty($data['password']) ? $data['password'] : Str::password(16);
 
             $administrator = User::create([
                 'school_id' => $school->id,

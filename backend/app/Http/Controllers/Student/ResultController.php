@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
@@ -15,12 +17,18 @@ class ResultController extends Controller
     public function index(Request $request): JsonResponse
     {
         $student = $request->user();
+        $targetTerm = $request->query('term');
+
+        $reportService = new \App\Services\Result\PupilPerformanceReportService;
+        $performanceReport = $reportService->getReportData($student, $targetTerm);
 
         $enrollments = Enrollment::where('student_id', $student->id)
             ->where(function ($q) {
                 $q->whereNotNull('score')
-                  ->orWhereNotNull('ca_score')
-                  ->orWhereNotNull('exam_score');
+                    ->orWhereNotNull('ca_score')
+                    ->orWhereNotNull('ca1_score')
+                    ->orWhereNotNull('ca2_score')
+                    ->orWhereNotNull('exam_score');
             })
             ->with('course')
             ->get()
@@ -36,6 +44,8 @@ class ResultController extends Controller
                     'name' => $e->course?->name ?? 'Course',
                     'code' => $e->course?->code ?? '',
                     'credits' => $e->course?->credits ?? 3,
+                    'ca1_score' => $e->ca1_score !== null ? (float) $e->ca1_score : null,
+                    'ca2_score' => $e->ca2_score !== null ? (float) $e->ca2_score : null,
                     'ca_score' => $e->ca_score !== null ? (float) $e->ca_score : null,
                     'exam_score' => $e->exam_score !== null ? (float) $e->exam_score : null,
                     'grade' => $e->grade ?? ($hasScore ? '—' : 'IP'),
@@ -60,6 +70,7 @@ class ResultController extends Controller
 
         return response()->json([
             'data' => [
+                'report' => $performanceReport,
                 'summary' => [
                     'cgpa' => $totalCredits > 0 ? round($creditWeighted / $totalCredits, 2) : 0,
                     'totalCredits' => $totalCredits,

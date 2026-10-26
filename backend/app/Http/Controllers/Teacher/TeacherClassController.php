@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
@@ -21,7 +23,7 @@ class TeacherClassController extends Controller
         // 2. Classes where the teacher teaches a subject
         $subjectClassIds = SchoolClass::whereHas('subjects', function ($q) use ($teacherId) {
             $q->where('courses.teacher_id', $teacherId)
-              ->orWhere('class_subject.teacher_id', $teacherId);
+                ->orWhere('class_subject.teacher_id', $teacherId);
         })->pluck('id');
 
         $classIds = $overseenClassIds->merge($subjectClassIds)->unique();
@@ -38,7 +40,7 @@ class TeacherClassController extends Controller
             ->withCount('students')
             ->with(['teacher:id,name', 'subjects' => function ($q) {
                 $q->select('courses.id', 'courses.code', 'courses.name', 'courses.department', 'courses.teacher_id')
-                  ->with('teacher:id,name');
+                    ->with('teacher:id,name');
             }])
             ->get()
             ->map(function ($c) use ($teacherId) {
@@ -55,6 +57,7 @@ class TeacherClassController extends Controller
                     'subjects' => $c->subjects->map(function ($s) use ($teacherId) {
                         $pivotTeacherId = $s->pivot?->teacher_id;
                         $isMySubject = ($s->teacher_id === $teacherId) || ($pivotTeacherId === $teacherId);
+
                         return [
                             'id' => $s->id,
                             'code' => $s->code,

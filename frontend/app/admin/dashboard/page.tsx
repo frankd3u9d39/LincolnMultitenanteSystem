@@ -5,8 +5,11 @@ import Link from 'next/link';
 import { useAsync } from '@/modules/superadmin/hooks/useAsync';
 import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
 import { getDashboard } from '@/modules/admin/services/api';
+import { useAuth } from '@/lib/auth/AuthProvider';
+import { SchoolInfoBanner } from '@/components/branding/SchoolInfoBanner';
 
 export default function AdminDashboardPage() {
+  const { user } = useAuth();
   const { data, loading, error, reload } = useAsync((signal) => getDashboard(signal), []);
 
   if (loading) {
@@ -28,19 +31,33 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-zinc-200">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-zinc-900 tracking-tight">{school.name}</h1>
-          <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-            {school.code} &middot; Academic year {school.academicYear ?? '—'}
-          </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex-1">
+          <SchoolInfoBanner
+            schoolName={user?.schoolName || school.name}
+            schoolMotto={user?.schoolMotto}
+            schoolLogo={user?.schoolLogo}
+            schoolCode={user?.schoolCode || school.code}
+            schoolAddress={user?.schoolAddress}
+            schoolEmail={user?.schoolEmail}
+            schoolPhone={user?.schoolPhone}
+            variant="card"
+          />
         </div>
-        <Link
-          href="/admin/announcements"
-          className="px-4 py-2 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10 w-max"
-        >
-          Post Announcement
-        </Link>
+        <div className="flex items-center gap-2 flex-shrink-0 self-start md:self-center">
+          <Link
+            href="/admin/school-settings"
+            className="px-4 py-2.5 rounded-xl border border-zinc-200 bg-white text-zinc-700 text-xs font-bold hover:bg-zinc-50 transition-all shadow-sm"
+          >
+            Edit School Info
+          </Link>
+          <Link
+            href="/admin/announcements"
+            className="px-4 py-2.5 rounded-xl bg-[#B81D22] text-white text-xs font-bold hover:bg-[#9E1519] transition-all shadow-md shadow-red-900/10"
+          >
+            Post Announcement
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

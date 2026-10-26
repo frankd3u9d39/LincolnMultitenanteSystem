@@ -5,6 +5,7 @@ use App\Http\Controllers\Teacher\TeacherAssignmentController;
 use App\Http\Controllers\Teacher\TeacherAttendanceController;
 use App\Http\Controllers\Teacher\TeacherClassController;
 use App\Http\Controllers\Teacher\TeacherDashboardController;
+use App\Http\Controllers\Teacher\TeacherResultController;
 use App\Http\Controllers\Teacher\TeacherStudentController;
 use Illuminate\Support\Facades\Route;
 
@@ -45,12 +46,12 @@ Route::prefix('teacher')->name('teacher.')->middleware(['auth:sanctum', 'teacher
     Route::apiResource('announcements', TeacherAnnouncementController::class)->only(['index', 'store']);
 
     // Assessment, Continuous Assessment (CA) & Examination Results
-    Route::get('/results/classes', [\App\Http\Controllers\Teacher\TeacherResultController::class, 'classes'])->name('results.classes');
-    Route::get('/classes/{schoolClass}/results', [\App\Http\Controllers\Teacher\TeacherResultController::class, 'index'])->name('classes.results.index');
-    Route::post('/classes/{schoolClass}/results', [\App\Http\Controllers\Teacher\TeacherResultController::class, 'store'])->name('classes.results.store');
-    Route::post('/classes/{schoolClass}/results/upload-csv', [\App\Http\Controllers\Teacher\TeacherResultController::class, 'uploadCsv'])->name('classes.results.upload-csv');
-    Route::post('/classes/{schoolClass}/results/csv-upload', [\App\Http\Controllers\Teacher\TeacherResultController::class, 'uploadCsv'])->name('classes.results.csv-upload');
-    Route::get('/classes/{schoolClass}/results/csv-template', [\App\Http\Controllers\Teacher\TeacherResultController::class, 'csvTemplate'])->name('classes.results.csv-template');
-    Route::get('/classes/{schoolClass}/results/export', [\App\Http\Controllers\Teacher\TeacherResultController::class, 'export'])->name('classes.results.export');
-    Route::get('/results/cbt-scripts/{submission}/download', [\App\Http\Controllers\Teacher\TeacherResultController::class, 'downloadCbtScript'])->name('results.cbt-scripts.download');
+    Route::get('/results/classes', [TeacherResultController::class, 'classes'])->name('results.classes');
+    Route::get('/classes/{schoolClass}/results', [TeacherResultController::class, 'index'])->name('classes.results.index');
+    Route::post('/classes/{schoolClass}/results', [TeacherResultController::class, 'store'])->name('classes.results.store');
+    Route::post('/classes/{schoolClass}/results/upload-csv', [TeacherResultController::class, 'uploadCsv'])->name('classes.results.upload-csv');
+    Route::post('/classes/{schoolClass}/results/csv-upload', [TeacherResultController::class, 'uploadCsv'])->name('classes.results.csv-upload');
+    Route::get('/classes/{schoolClass}/results/csv-template', [TeacherResultController::class, 'csvTemplate'])->name('classes.results.csv-template');
+    Route::get('/classes/{schoolClass}/results/export', [TeacherResultController::class, 'export'])->name('classes.results.export');
+    Route::get('/results/cbt-scripts/{submission}/download', [TeacherResultController::class, 'downloadCbtScript'])->name('results.cbt-scripts.download');
 });

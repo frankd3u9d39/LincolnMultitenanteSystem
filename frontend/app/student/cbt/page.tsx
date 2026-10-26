@@ -114,6 +114,9 @@ export default function StudentCbtPage() {
 
     // 1. Hide sidebar & navbar by attaching class to body
     document.body.classList.add('cbt-exam-active');
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
 
     // 2. Set 2.5s grace period so initial paint and fullscreen transition don't trigger false positives
     gracePeriodEndRef.current = Date.now() + 2500;
@@ -253,6 +256,9 @@ export default function StudentCbtPage() {
           console.warn('Fullscreen request blocked or unsupported:', err);
         }
 
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
         setStage('exam');
       } else {
         setVerifyError(resp.message || 'Could not verify exam access.');
@@ -578,7 +584,7 @@ export default function StudentCbtPage() {
             <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black text-emerald-950 uppercase tracking-wide">
-                  SuperAdmin / Admin Exam Access Code *
+                  Admin Exam Access Code
                 </label>
                 <span className="text-[10px] font-bold text-emerald-700">Required</span>
               </div>
@@ -612,7 +618,7 @@ export default function StudentCbtPage() {
     );
   }
 
-  // 4. ACTIVE CBT EXAMINATION ROOM - LOCKED KIOSK MODE (NO SIDEBAR, NO NAVBAR)
+  // 4. ACTIVE CBT EXAMINATION ROOM - LOCKED KIOSK MODE (LIGHT THEME - NO SIDEBAR, NO NAVBAR)
   if (stage === 'exam' && activeExamInfo && activeQuestions.length > 0) {
     const currentQ = activeQuestions[currentQIndex];
     const isLastQ = currentQIndex === activeQuestions.length - 1;
@@ -621,34 +627,37 @@ export default function StudentCbtPage() {
     return (
       <div
         id="cbt-locked-exam-hall"
-        className="fixed inset-0 z-[99999] w-screen h-screen bg-zinc-950 text-white flex flex-col overflow-hidden select-none"
+        className="fixed inset-0 z-[99999] w-screen h-screen bg-[#F8FAFC] text-slate-900 flex flex-col overflow-hidden select-none"
         style={{ margin: 0, padding: 0 }}
       >
         {/* High-Security Top Control Bar */}
-        <header className="px-5 py-3.5 bg-zinc-900/95 backdrop-blur-md border-b border-zinc-800/90 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-lg">
+        <header
+          id="cbt-exam-hall-header"
+          className="px-5 py-3.5 bg-white/95 backdrop-blur-md border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-xs z-10"
+        >
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#B81D22] text-white flex items-center justify-center font-black text-sm shadow-md">
               CBT
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-200 font-mono text-[10px] font-bold border border-zinc-700">
+                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-mono text-[10px] font-bold border border-slate-200">
                   {activeExamInfo.courseCode}
                 </span>
-                <h2 className="font-black text-white text-sm sm:text-base tracking-tight">
+                <h2 className="font-black text-slate-900 text-sm sm:text-base tracking-tight">
                   {activeExamInfo.courseName}
                 </h2>
               </div>
-              <p className="text-[11px] text-zinc-400 mt-0.5">
-                Candidate: <span className="text-zinc-200 font-bold">{formName}</span> ({formIdNumber})
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Candidate: <span className="text-slate-900 font-bold">{formName}</span> ({formIdNumber})
               </p>
             </div>
           </div>
 
           {/* Security Status Indicator & Controls */}
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-emerald-400 text-[11px] font-bold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>Screen Locked • Anti-Cheat Active</span>
             </div>
 
@@ -656,7 +665,7 @@ export default function StudentCbtPage() {
               <button
                 type="button"
                 onClick={requestFullscreenLock}
-                className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold hover:bg-amber-500/30 transition-all cursor-pointer animate-pulse"
+                className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 text-xs font-bold hover:bg-amber-100 transition-all cursor-pointer animate-pulse"
                 title="Click to re-engage full screen lock"
               >
                 🔒 Lock Fullscreen
@@ -666,13 +675,13 @@ export default function StudentCbtPage() {
             {/* Countdown Timer */}
             <div
               id="cbt-timer"
-              className={`px-3.5 py-1.5 rounded-xl border flex items-center gap-2 font-mono font-black text-base sm:text-lg ${
+              className={`px-3.5 py-1.5 rounded-xl border flex items-center gap-2 font-mono font-black text-base sm:text-lg shadow-2xs ${
                 timeLeft < 300
-                  ? 'bg-red-950/80 text-red-400 border-red-500/60 animate-pulse'
-                  : 'bg-zinc-800 text-zinc-100 border-zinc-700'
+                  ? 'bg-red-50 text-red-700 border-red-300 animate-pulse'
+                  : 'bg-white text-slate-900 border-slate-300'
               }`}
             >
-              <svg className="w-4 h-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className={`w-4 h-4 ${timeLeft < 300 ? 'text-red-600' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>{formatTimer(timeLeft)}</span>
@@ -692,8 +701,8 @@ export default function StudentCbtPage() {
         </header>
 
         {/* Security Warning Bar */}
-        <div className="bg-red-950/70 border-b border-red-900/50 px-4 py-1.5 text-center text-[11px] text-red-200 font-medium flex items-center justify-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" />
+        <div className="bg-red-50 border-b border-red-200 px-4 py-1.5 text-center text-[11px] text-red-800 font-medium flex items-center justify-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping" />
           <span>
             Anti-Cheat Enforcement: Leaving this locked window, switching tabs, or exiting full-screen will trigger <strong>instant automatic submission</strong>.
           </span>
@@ -703,10 +712,10 @@ export default function StudentCbtPage() {
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 flex flex-col items-center">
           <div className="max-w-4xl w-full space-y-5">
             {/* Question Navigator Palette */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-md">
-              <div className="flex items-center justify-between text-xs text-zinc-400 mb-2.5">
-                <span className="font-bold text-zinc-200">Question Palette</span>
-                <span id="cbt-answered-count" className="font-mono text-zinc-400">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+              <div className="flex items-center justify-between text-xs text-slate-500 mb-2.5">
+                <span className="font-bold text-slate-800">Question Palette</span>
+                <span id="cbt-answered-count" className="font-mono text-slate-600 font-bold">
                   {answeredCount} / {activeQuestions.length} Answered
                 </span>
               </div>
@@ -722,10 +731,10 @@ export default function StudentCbtPage() {
                       onClick={() => setCurrentQIndex(idx)}
                       className={`w-9 h-9 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                         isCurrent
-                          ? 'bg-white text-zinc-950 ring-2 ring-white ring-offset-2 ring-offset-zinc-950'
+                          ? 'bg-[#B81D22] text-white ring-2 ring-[#B81D22]/30 ring-offset-2 ring-offset-white font-black shadow-xs'
                           : isAnswered
-                          ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900'
-                          : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold hover:bg-emerald-100'
+                          : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 hover:text-slate-900 font-semibold'
                       }`}
                     >
                       {idx + 1}
@@ -736,15 +745,15 @@ export default function StudentCbtPage() {
             </div>
 
             {/* Question Content Card */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
-                <span id="cbt-current-question-header" className="text-xs font-black text-red-400 uppercase tracking-wider">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-md space-y-6">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                <span id="cbt-current-question-header" className="text-xs font-black text-[#B81D22] uppercase tracking-wider">
                   Question {currentQIndex + 1} of {activeQuestions.length}
                 </span>
-                <span className="text-xs text-zinc-400 font-mono">Weight: 6.0 Points</span>
+                <span className="text-xs text-slate-500 font-mono font-bold">Weight: 6.0 Points</span>
               </div>
 
-              <h3 id="cbt-question-text" className="text-base sm:text-lg font-bold text-zinc-100 leading-relaxed">
+              <h3 id="cbt-question-text" className="text-base sm:text-lg font-bold text-slate-900 leading-relaxed">
                 {currentQ.question}
               </h3>
 
@@ -760,18 +769,18 @@ export default function StudentCbtPage() {
                       onClick={() => handleSelectOption(currentQ.id, optKey)}
                       className={`w-full text-left p-4 rounded-2xl border transition-all flex items-start gap-3.5 cursor-pointer ${
                         isSelected
-                          ? 'border-red-500 bg-red-950/40 shadow-md ring-1 ring-red-500/50'
-                          : 'border-zinc-800 bg-zinc-950/60 hover:bg-zinc-800/80 text-zinc-300'
+                          ? 'border-[#B81D22] bg-red-50/70 shadow-sm ring-1 ring-[#B81D22]/30 text-slate-900'
+                          : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100/80 text-slate-800'
                       }`}
                     >
                       <span
                         className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
-                          isSelected ? 'bg-[#B81D22] text-white shadow-sm' : 'bg-zinc-800 text-zinc-300'
+                          isSelected ? 'bg-[#B81D22] text-white shadow-xs' : 'bg-white border border-slate-300 text-slate-700'
                         }`}
                       >
                         {optKey}
                       </span>
-                      <span className="text-xs sm:text-sm text-zinc-200 font-medium pt-0.5 leading-relaxed">
+                      <span className={`text-xs sm:text-sm pt-0.5 leading-relaxed ${isSelected ? 'font-bold text-slate-950' : 'font-medium text-slate-800'}`}>
                         {optText}
                       </span>
                     </button>
@@ -780,13 +789,13 @@ export default function StudentCbtPage() {
               </div>
 
               {/* Navigation Controls */}
-              <div className="flex items-center justify-between pt-6 border-t border-zinc-800">
+              <div className="flex items-center justify-between pt-6 border-t border-slate-200">
                 <button
                   id="cbt-prev-btn"
                   type="button"
                   disabled={currentQIndex === 0}
                   onClick={() => setCurrentQIndex((prev) => Math.max(0, prev - 1))}
-                  className="px-4 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-300 text-xs font-bold hover:bg-zinc-700 disabled:opacity-30 transition-colors cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-100 disabled:opacity-30 transition-colors cursor-pointer shadow-2xs"
                 >
                   &larr; Previous Question
                 </button>
@@ -806,7 +815,7 @@ export default function StudentCbtPage() {
                     id="cbt-next-btn"
                     type="button"
                     onClick={() => setCurrentQIndex((prev) => Math.min(activeQuestions.length - 1, prev + 1))}
-                    className="px-5 py-2.5 rounded-xl bg-white text-zinc-950 text-xs font-black hover:bg-zinc-200 transition-colors cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-black hover:bg-slate-800 transition-colors cursor-pointer shadow-xs"
                   >
                     Next Question &rarr;
                   </button>
@@ -817,25 +826,25 @@ export default function StudentCbtPage() {
         </div>
 
         {/* Security Footer */}
-        <footer className="px-6 py-2.5 bg-zinc-900/90 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500 shrink-0 font-mono">
-          <span>Candidate: {formName}</span>
-          <span className="hidden sm:inline">Kiosk Examination Mode • Tab switching &amp; window exit disabled</span>
-          <span>{answeredCount}/{activeQuestions.length} Saved</span>
+        <footer className="px-6 py-2.5 bg-white border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500 shrink-0 font-mono">
+          <span>Candidate: <strong className="text-slate-800">{formName}</strong></span>
+          <span className="hidden sm:inline">Kiosk Examination Mode &bull; Tab switching &amp; window exit disabled</span>
+          <span className="font-bold text-slate-700">{answeredCount}/{activeQuestions.length} Saved</span>
         </footer>
 
         {/* In-App Submission Confirmation Modal */}
         {showConfirmModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100000] flex items-center justify-center p-4">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4 text-white">
-              <div className="w-12 h-12 rounded-full bg-red-950/80 border border-red-500/40 text-red-400 flex items-center justify-center text-xl font-black mx-auto">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100000] flex items-center justify-center p-4">
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4 text-slate-900">
+              <div className="w-12 h-12 rounded-full bg-red-50 border border-red-200 text-[#B81D22] flex items-center justify-center text-xl font-black mx-auto">
                 !
               </div>
               <div className="text-center">
-                <h3 className="text-lg font-black text-white">Confirm Exam Submission</h3>
-                <p className="text-xs text-zinc-300 mt-2 leading-relaxed">
+                <h3 className="text-lg font-black text-slate-900">Confirm Exam Submission</h3>
+                <p className="text-xs text-slate-600 mt-2 leading-relaxed">
                   Are you ready to submit your exam? You have answered <strong>{answeredCount}</strong> of <strong>{activeQuestions.length}</strong> questions.
                 </p>
-                <p className="text-[11px] text-zinc-400 mt-1">
+                <p className="text-[11px] text-slate-500 mt-1">
                   Once submitted, your answers will be compiled into an official PDF Answer Script and delivered to your course teacher for manual evaluation. Scores will only be published after your teacher marks and uploads the results.
                 </p>
               </div>
@@ -844,7 +853,7 @@ export default function StudentCbtPage() {
                   id="cbt-cancel-submit-modal-btn"
                   type="button"
                   onClick={() => setShowConfirmModal(false)}
-                  className="flex-1 py-3 rounded-xl border border-zinc-700 bg-zinc-800 text-xs font-bold text-zinc-200 hover:bg-zinc-700 cursor-pointer"
+                  className="flex-1 py-3 rounded-xl border border-slate-300 bg-slate-100 text-xs font-bold text-slate-700 hover:bg-slate-200 cursor-pointer transition-colors"
                 >
                   Continue Test
                 </button>
@@ -856,7 +865,7 @@ export default function StudentCbtPage() {
                     handleAutoSubmit('Manual Candidate Submission');
                   }}
                   disabled={submitting}
-                  className="flex-1 py-3 rounded-xl bg-[#B81D22] text-white text-xs font-black hover:bg-[#9E1519] disabled:opacity-50 cursor-pointer shadow-md shadow-red-900/20"
+                  className="flex-1 py-3 rounded-xl bg-[#B81D22] text-white text-xs font-black hover:bg-[#9E1519] disabled:opacity-50 cursor-pointer shadow-md shadow-red-900/20 transition-all"
                 >
                   {submitting ? 'Submitting…' : 'Yes, Submit Exam'}
                 </button>

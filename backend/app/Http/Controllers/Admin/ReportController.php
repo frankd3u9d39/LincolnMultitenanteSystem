@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -35,7 +37,7 @@ class ReportController extends Controller
             ->where('status', '!=', Enrollment::STATUS_WITHDRAWN)
             ->count();
         $courseRetentionRate = $totalEnrollments > 0
-            ? round(($activeEnrollments / $totalEnrollments) * 100, 1) . '%'
+            ? round(($activeEnrollments / $totalEnrollments) * 100, 1).'%'
             : '0.0%';
 
         // Real attendance benchmark from database
@@ -44,17 +46,17 @@ class ReportController extends Controller
             ->whereIn('status', ['present', 'late'])
             ->count();
         $attendanceBenchmark = $attTotal > 0
-            ? round(($attPresent / $attTotal) * 100, 1) . '%'
+            ? round(($attPresent / $attTotal) * 100, 1).'%'
             : '0.0%';
 
         // Real faculty ratio
         $facultyRatio = '0 : 0';
         if ($teacherCount > 0 && $studentCount > 0) {
-            $facultyRatio = '1 : ' . round($studentCount / $teacherCount);
+            $facultyRatio = '1 : '.round($studentCount / $teacherCount);
         } elseif ($teacherCount > 0) {
             $facultyRatio = '1 : 0';
         } elseif ($studentCount > 0) {
-            $facultyRatio = '0 : ' . $studentCount;
+            $facultyRatio = '0 : '.$studentCount;
         }
 
         // Real monthly enrollment and revenue trend from database for last 6 months
@@ -121,9 +123,9 @@ class ReportController extends Controller
                 'totalEnrollment' => $studentCount,
                 'totalFaculty' => $teacherCount,
                 'facultyRatio' => $facultyRatio,
-                'feeCollectionRate' => $feesTotal > 0 ? round(($feesPaid / $feesTotal) * 100, 1) . '%' : '0.0%',
-                'totalRevenue' => '₦' . number_format($feesPaid, 2),
-                'outstandingBalances' => '₦' . number_format($feesOutstanding, 2),
+                'feeCollectionRate' => $feesTotal > 0 ? round(($feesPaid / $feesTotal) * 100, 1).'%' : '0.0%',
+                'totalRevenue' => '₦'.number_format($feesPaid, 2),
+                'outstandingBalances' => '₦'.number_format($feesOutstanding, 2),
                 'attendanceBenchmark' => $attendanceBenchmark,
                 'courseRetentionRate' => $courseRetentionRate,
             ],

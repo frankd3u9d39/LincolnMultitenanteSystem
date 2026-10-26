@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -29,6 +31,8 @@ class SchoolSettingController extends Controller
         $school = $request->user()->school;
 
         $data = $request->validate([
+            'name' => ['sometimes', 'string', 'max:255'],
+            'motto' => ['sometimes', 'nullable', 'string', 'max:255'],
             'contactEmail' => ['sometimes', 'email', 'max:255'],
             'contactPhone' => ['sometimes', 'nullable', 'string', 'max:30'],
             'address' => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -40,6 +44,8 @@ class SchoolSettingController extends Controller
         ]);
 
         $map = [
+            'name' => 'name',
+            'motto' => 'motto',
             'contactEmail' => 'contact_email',
             'contactPhone' => 'contact_phone',
             'address' => 'address',
@@ -78,7 +84,9 @@ class SchoolSettingController extends Controller
     {
         return [
             'name' => $school->name,
+            'motto' => $school->motto,
             'code' => $school->code,
+            'logoUrl' => $school->logo_url,
             'contactEmail' => $school->contact_email,
             'contactPhone' => $school->contact_phone,
             'address' => $school->address,

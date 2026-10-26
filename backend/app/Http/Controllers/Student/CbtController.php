@@ -1,15 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
 use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
-use App\Models\Course;
-use App\Models\Enrollment;
 use App\Models\School;
 use App\Models\Student;
-use App\Models\User;
+use App\Services\Pdf\CbtScriptPdfService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,7 +47,7 @@ class CbtController extends Controller
             ->get();
 
         $studentProfile = $student->studentProfile;
-        $studentIdNumber = $studentProfile?->student_id_number ?? ('LC-STD-' . str_pad($student->id, 4, '0', STR_PAD_LEFT));
+        $studentIdNumber = $studentProfile?->student_id_number ?? ('LC-STD-'.str_pad((string) $student->id, 4, '0', STR_PAD_LEFT));
 
         $exams = $cbtAssignments->map(function (Assignment $a) use ($student) {
             $meta = json_decode($a->instructions, true) ?? [];
@@ -65,7 +65,7 @@ class CbtController extends Controller
 
             return [
                 'id' => $a->id,
-                'examCode' => 'CBT-' . ($a->course?->code ?? 'EXAM') . '-' . $a->id,
+                'examCode' => 'CBT-'.($a->course?->code ?? 'EXAM').'-'.$a->id,
                 'courseCode' => $a->course?->code ?? 'GEN',
                 'courseName' => $a->course?->name ?? $a->title,
                 'title' => $a->title,
@@ -135,6 +135,7 @@ class CbtController extends Controller
             $msg = $alreadySubmitted->status === 'graded'
                 ? sprintf('You have already completed and submitted this examination with an awarded score of %d%%.', $alreadySubmitted->score)
                 : 'You have already submitted this examination. Your answer script is with your course teacher for manual marking and result upload.';
+
             return response()->json([
                 'verified' => false,
                 'message' => $msg,
@@ -184,7 +185,7 @@ class CbtController extends Controller
         $reason = $validated['reason'] ?? 'Standard Exam Completion';
 
         // Generate Candidate Answer Script PDF for teacher evaluation and manual marking
-        $pdfService = new \App\Services\Pdf\CbtScriptPdfService();
+        $pdfService = new CbtScriptPdfService;
         $pdfResult = $pdfService->generateCandidateScriptPdf(
             $assignment,
             $student,
@@ -217,8 +218,8 @@ class CbtController extends Controller
         );
 
         $studentProfile = $student->studentProfile;
-        $studentIdNumber = $studentProfile?->student_id_number ?? ('LC-STD-' . str_pad($student->id, 4, '0', STR_PAD_LEFT));
-        $courseTitle = ($assignment->course?->code ?? 'CBT') . ' - ' . ($assignment->course?->name ?? $assignment->title);
+        $studentIdNumber = $studentProfile?->student_id_number ?? ('LC-STD-'.str_pad((string) $student->id, 4, '0', STR_PAD_LEFT));
+        $courseTitle = ($assignment->course?->code ?? 'CBT').' - '.($assignment->course?->name ?? $assignment->title);
 
         return response()->json([
             'message' => 'Examination submitted successfully. Your answer script has been compiled into an official PDF document and delivered to your course teacher for manual marking.',
@@ -262,7 +263,7 @@ class CbtController extends Controller
             ],
             [
                 'id' => 2,
-                'question' => "What is the primary objective of Continuous Assessment (CA) alongside Terminal Examinations in school curriculum?",
+                'question' => 'What is the primary objective of Continuous Assessment (CA) alongside Terminal Examinations in school curriculum?',
                 'options' => [
                     'A' => 'To evaluate student progress systematically throughout the academic term',
                     'B' => 'To replace classroom teaching entirely with homework tests',
@@ -295,7 +296,7 @@ class CbtController extends Controller
             ],
             [
                 'id' => 5,
-                'question' => "Which characteristic is essential for computer-based testing (CBT) workstations in an accredited school computer laboratory?",
+                'question' => 'Which characteristic is essential for computer-based testing (CBT) workstations in an accredited school computer laboratory?',
                 'options' => [
                     'A' => 'Reliable network connectivity, dedicated display, and secure input devices',
                     'B' => 'High-end gaming graphics cards without internet connection',
@@ -317,7 +318,7 @@ class CbtController extends Controller
             ],
             [
                 'id' => 7,
-                'question' => "What is the recommended response if a student encounters a temporary display interruption during a timed CBT examination?",
+                'question' => 'What is the recommended response if a student encounters a temporary display interruption during a timed CBT examination?',
                 'options' => [
                     'A' => 'Notify the accredited invigilator or administrator immediately without leaving the station',
                     'B' => 'Leave the examination hall and forfeit the remaining test duration',
@@ -339,7 +340,7 @@ class CbtController extends Controller
             ],
             [
                 'id' => 9,
-                'question' => "What is the role of an Exam Access Code in a secure CBT environment?",
+                'question' => 'What is the role of an Exam Access Code in a secure CBT environment?',
                 'options' => [
                     'A' => 'To authenticate the student and ensure the exam can only start when authorized by the supervisor',
                     'B' => 'To change the student account password permanently',

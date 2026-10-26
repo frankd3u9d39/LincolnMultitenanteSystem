@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
@@ -202,6 +204,14 @@ class AuthController extends Controller
             'schoolName' => $user->school?->name,
             'schoolCode' => $user->school?->code,
             'schoolLogo' => $user->school?->logo_url,
+            'schoolMotto' => $user->school?->motto,
+            'schoolAddress' => implode(', ', array_filter([
+                $user->school?->address,
+                $user->school?->city,
+                $user->school?->state,
+            ])) ?: null,
+            'schoolEmail' => $user->school?->contact_email,
+            'schoolPhone' => $user->school?->contact_phone,
             'schoolTheme' => [
                 'primaryColor' => $user->school?->primary_color ?? '#B81D22',
                 'secondaryColor' => $user->school?->secondary_color ?? '#9E1519',

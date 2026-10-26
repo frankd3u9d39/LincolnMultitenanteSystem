@@ -3,13 +3,14 @@
 import React, { useState } from 'react';
 import { useAsync } from '@/modules/superadmin/hooks/useAsync';
 import { ErrorBlock, LoadingBlock } from '@/modules/superadmin/components/LoadState';
-import { getResultOverview } from '@/modules/admin/services/api';
+import { getResultOverview, downloadStudentPerformanceReportPdf } from '@/modules/admin/services/api';
 import { ClassResultsView } from '@/modules/admin/components';
 
 export default function AdminResultsPage() {
   const [activeTab, setActiveTab] = useState<'class_results' | 'overview'>('class_results');
   const [search, setSearch] = useState('');
   const [standingFilter, setStandingFilter] = useState('all');
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const { data, loading, error, reload } = useAsync((signal) => getResultOverview(signal), []);
 
@@ -201,10 +202,30 @@ export default function AdminResultsPage() {
                 </td>
                 <td className="py-3 px-4 text-right">
                   <button
-                    onClick={() => alert(`Transcript for ${st.name} downloaded.`)}
-                    className="text-xs font-bold text-[#B81D22] hover:underline"
+                    onClick={async () => {
+                      try {
+                        setDownloadingId(st.id);
+                        await downloadStudentPerformanceReportPdf(st.id, st.name);
+                      } catch {
+                        alert(`Failed to download report card for ${st.name}.`);
+                      } finally {
+                        setDownloadingId(null);
+                      }
+                    }}
+                    disabled={downloadingId === st.id}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#0284C7] text-xs font-bold border border-sky-200 transition-all shadow-2xs disabled:opacity-50 cursor-pointer"
+                    title="Download official Pupil's Performance Report (PDF)"
                   >
-                    Transcript &rarr;
+                    {downloadingId === st.id ? (
+                      <span>Generating PDF...</span>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5 text-[#0284C7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        <span>Pupil Report (PDF)</span>
+                      </>
+                    )}
                   </button>
                 </td>
               </tr>
